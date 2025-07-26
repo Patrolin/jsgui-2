@@ -28,3 +28,7 @@ function App(body) {
 }
 renderBody(App, { background: "#0f0f0f", scrollY: true, color: "white" });
 ```
+[Open demo](https://patrolin.github.io/jsgui-2/demo/)
+
+## Docs (WIP)
+https://patrolin.github.io/jsgui-2/
