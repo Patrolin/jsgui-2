@@ -1,3 +1,4 @@
+// TODO: flex, className, events
 /**
  * @typedef {Object} Component
  * @property {Record<string, Component>} children

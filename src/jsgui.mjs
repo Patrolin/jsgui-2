@@ -1,3 +1,4 @@
+// TODO: background: `color-mix(in srgb, #7f7f7f ${100 - percent}%, ${base_color_right} ${percent}%)`
 /**
  * @param {number | string} value
  * @returns string */
