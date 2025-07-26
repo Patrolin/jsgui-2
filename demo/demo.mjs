@@ -1,15 +1,3 @@
-# jsgui-2
-A faster replacement for React.
-
-## Usage
-```html
-<head>
-  <link rel="stylesheet" href="../src/lib.css" />
-  <script type="module" src="demo.mjs"></script>
-</head>
-```
-app.mjs
-```js
 import { div, span, button, useState, renderBody } from "../src/jsgui.mjs";
 
 /**
@@ -27,4 +15,3 @@ function App(body) {
   }
 }
 renderBody(App, { background: "#0f0f0f", scrollY: true, color: "white" });
-```

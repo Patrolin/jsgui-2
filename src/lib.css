@@ -1,0 +1,72 @@
+/* default */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  outline: none;
+  border: none;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  display: inline-block;
+}
+head, head * {
+  display: none;
+}
+html, body {
+  width: 100%;
+  height: 100%;
+}
+svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+button:hover {
+  cursor: pointer;
+  background: #ffffffcd;
+}
+button:active {
+  background: #ffffff9b;
+}
+[data-overflow="false"] {
+  scrollbar-color: transparent #00000032;
+}
+
+/* props */
+[scroll-x] {
+  overflow-x: scroll;
+}
+[scroll-y] {
+  overflow-y: scroll;
+}
+
+[flex] {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+[flex="x"] {
+  flex-direction: row;
+}
+[flex="x-reverse"] {
+  flex-direction: row-reverse;
+}
+[flex="y"] {
+  flex-direction: column;
+}
+[flex="y-reverse"] {
+  flex-direction: column-reverse;
+}
+
+/*[flex-align="center"] {
+  justify-content: center;
+  align-items: center;
+}*/
+[flex-align="justify"] {
+  justify-content: space-between;
+  align-items: center;
+}
+[flex-align="start"] {
+  justify-content: flex-start;
+  align-items: flex-start;
+}
