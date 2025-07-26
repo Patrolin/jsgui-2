@@ -71,7 +71,7 @@ export function _styleElement(e, props = {}) {
 function _removeUnusedComponents(info, current_gc) {
   for (let [key, child_info] of Object.entries(info.children)) {
     _removeUnusedComponents(child_info, current_gc);
-    if (child_info.gc !== current_gc) {
+    if (child_info._gc !== current_gc) {
       console.log("DELETE", info, current_gc);
       child_info.element.remove();
       delete info.children[key];
@@ -88,7 +88,7 @@ function _recomputeOverflow() {
   }
 }
 
-export let _root_info = /** @type {Component} */(/** @type {unknown} */({ element: null, state: {}, children: {}, gc: true, nextIndex: 0, nextChild: null }));
+export const _root_info = /** @type {Component} */(/** @type {unknown} */({ children: {}, element: null, state: {}, _gc: true, _nextChild: null, _nextIndex: 0 }));
 /**
  * @param {(parent: Component) => void} Root
  * @param {HTMLProps} bodyProps */
@@ -101,14 +101,14 @@ export function renderBody(Root, bodyProps) {
 }
 function _renderNow() {
   // reset info
-  _root_info.gc = !_root_info.gc;
-  _root_info.nextIndex = 0;
-  _root_info.nextChild = /** @type HTMLElement | null */(_root_info.element.firstElementChild);
+  _root_info._gc = !_root_info._gc;
+  _root_info._nextIndex = 0;
+  _root_info._nextChild = /** @type HTMLElement | null */(_root_info.element.firstElementChild);
   // render Root component
   const { Root, bodyProps } = _root_info.state;
   _styleElement(_root_info.element, bodyProps);
   Root(_root_info);
-  _removeUnusedComponents(_root_info, _root_info.gc);
+  _removeUnusedComponents(_root_info, _root_info._gc);
   _recomputeOverflow();
 }
 export function rerender() {
@@ -127,18 +127,18 @@ export function rerender() {
  * @returns {Component} */
 export function _getChildInfo(parent, key, tagName) {
   if (key == null || key === "") {
-    key = `${parent.nextIndex++}-${tagName}`;
+    key = `${parent._nextIndex++}-${tagName}`;
   }
   let info;
   if (key in parent.children) {
     info = parent.children[key];
   } else {
     info = parent.children[key] = /** @type {Component} */ (/** @type {unknown} */ (
-      { element: null, state: {}, children: {}, gc: true, nextIndex: 0, nextChild: null }
+      { children: {}, element: null, state: {}, _gc: true, _nextChild: null, _nextIndex: 0 }
     ));
   }
-  info.gc = parent.gc;
-  info.nextIndex = 0;
+  info._gc = parent._gc;
+  info._nextIndex = 0;
   return info;
 }
 /**
@@ -148,11 +148,11 @@ function _appendOrMoveElement(parent, info) {
   const element = info.element;
   if (element == null) return; // NOTE: appending a fragment does nothing
 
-  info.nextChild = /** @type {HTMLElement | null} */(element.firstElementChild);
-  if (element === parent.nextChild) {
-    parent.nextChild = /** @type {HTMLElement | null} */(element.nextElementSibling);
+  info._nextChild = /** @type {HTMLElement | null} */(element.firstElementChild);
+  if (element === parent._nextChild) {
+    parent._nextChild = /** @type {HTMLElement | null} */(element.nextElementSibling);
   } else {
-    parent.element.insertBefore(element, parent.nextChild);
+    parent.element.insertBefore(element, parent._nextChild);
   }
 }
 /**

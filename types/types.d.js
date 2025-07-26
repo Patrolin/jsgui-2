@@ -1,12 +1,11 @@
 /**
  * @typedef {Object} Component
+ * @property {Record<string, Component>} children
  * @property {HTMLElement} element
  * @property {any} state
- * @property {Record<string, Component>} children
- * Internal:
- * @property {boolean} gc
- * @property {number} nextIndex
- * @property {HTMLElement | null} nextChild
+ * @property {boolean} _gc
+ * @property {HTMLElement | null} _nextChild
+ * @property {number} _nextIndex
  */
 /**
  * @typedef {Object} HTMLProps
