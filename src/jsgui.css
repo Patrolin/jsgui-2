@@ -68,5 +68,10 @@ button:active {
 }
 [flex-align="start"] {
   justify-content: flex-start;
+  align-items: stretch;
+}
+[flex-align="wrap"] {
+  justify-content: flex-start;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
