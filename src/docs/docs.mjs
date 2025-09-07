@@ -71,14 +71,14 @@ function App(body) {
   const main = div(body, { width: "100%", padding: "8px 24px", flex: "x", flexAlign: "start", columnGap: 16 });
   const mainLeft = div(main, { flex: "y" });
   for (let i = 0; i < state.lineCount; i++) {
-    span(mainLeft, { width: "100%" }, `Lorem ipsum ${i}`);
+    span(mainLeft, `Lorem ipsum ${i}`, { width: "100%" });
   }
   for (let i = 0; i < state.lineCount; i++) {
-    span(mainLeft, { width: "100%" }, `Dolor amet ${state.lineCount + i}`);
+    span(mainLeft, `Dolor amet ${state.lineCount + i}`, { width: "100%" });
   }
 
   const mainRight = div(main, { flex: "y" });
-  if (button(mainRight, { width: 64, height: 24 }, "Hello").pressed) {
+  if (button(mainRight, "Hello", { width: 64, height: 24 }).pressed) {
     state.lineCount += 1
     rerender();
   }

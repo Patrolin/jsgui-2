@@ -8,8 +8,8 @@ function App(body) {
   });
 
   const row = div(body, {padding: 8, flex: "x", columnGap: 8});
-  span(row, {}, `Clicks: ${state.clicks}`);
-  if (button(row, {margin: "0"}, "Press me!").pressed) {
+  span(row, `Clicks: ${state.clicks}`);
+  if (button(row, "Press me!", {margin: "0"}).pressed) {
     state.clicks += 1
     rerender();
   }

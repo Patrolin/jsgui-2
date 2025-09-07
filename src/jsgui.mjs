@@ -82,7 +82,7 @@ function _removeUnusedComponents(info, current_gc) {
   for (let [key, child_info] of Object.entries(info.children)) {
     _removeUnusedComponents(child_info, current_gc);
     if (child_info._gc !== current_gc) {
-      console.log("DELETE", info, current_gc);
+      console.log("ayaya.DELETE", info, current_gc);
       child_info.element.remove();
       delete info.children[key];
     }
@@ -206,7 +206,7 @@ export function div(parent, props) {
  * @param {HTMLProps} [props]
  * @param {string} [text]
  * @returns {Component} */
-export function span(parent, props, text = "") {
+export function span(parent, text, props) {
   const info = getElement(parent, "span", props);
   info.element.textContent = text;
   return info;
@@ -233,9 +233,9 @@ export function svg(parent, props, innerHTML) {
  * @param {HTMLProps} [props]
  * @param {string} [text]
  * @returns {{info: Component, pressed: boolean}} */
-export function button(parent, props, text) {
+export function button(parent, text, props) {
   const info = getElement(parent, "button", { flex: "x", ...props });
-  if (text != null) span(info, { key: "button-text" }, text); // NOTE: browsers are stupid and don't respect textContent on buttons
+  if (text != null) span(info, text, { key: "button-text" }); // NOTE: browsers are stupid and don't respect textContent on buttons
   const pressed = info.state.pressed;
   info.state.pressed = false;
   info.element.onclick = () => {
