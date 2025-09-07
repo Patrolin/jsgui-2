@@ -132,7 +132,7 @@ function App(body) {
         +1, -1,
       ]));
       gl.uniformMatrix4fv(
-        /** @type {GLBufferInfo} */(flatColor.uniforms.u_mat),
+        /** @type {WebGLUniformLocation} */(flatColor.uniforms.u_mat),
         false, [
         1, 0, 0, 0,
         0, 1, 0, 0,
@@ -140,7 +140,7 @@ function App(body) {
         0, 0, 0, 1,
       ]);
       gl.uniform3f(
-        /** @type {GLBufferInfo} */(flatColor.uniforms.u_color),
+        /** @type {WebGLUniformLocation} */(flatColor.uniforms.u_color),
         0, 0.5, 1);
       gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 
