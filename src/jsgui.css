@@ -1,13 +1,21 @@
-/* default */
+/* fixes for default browser styles */
+:root {
+  --fontSize: 14px;
+}
 * {
   box-sizing: border-box;
+  min-width: 0;
   margin: 0;
   outline: none;
   border: none;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
+  background: none;
   display: inline-block;
+  overflow: hidden;
+  color: inherit;
+  line-height: unset;
+  font-size: var(--font-size);
+  font-family: inherit;
+  font-weight: inherit;
 }
 head, head * {
   display: none;
@@ -16,23 +24,54 @@ html, body {
   width: 100%;
   height: 100%;
 }
+body {
+  background: #f0f0f0;
+  color: #0f0f0f;
+}
+
+/* font-size */
+h1 {
+  --font-size: 20px;
+  font-weight: 700;
+}
+h2 {
+  --font-size: 16px;
+  font-weight: 500;
+}
+body, h3 {
+  --font-size: 14px;
+  font-weight: 400;
+}
+h4, h5, h6 {
+  --font-size: 12px;
+  font-weight: 400;
+}
+h1, h2, h3, h4, h5, h6, span {
+  line-height: round(down, calc(var(--fontSize) * 1.4));
+}
+
+/* components */
 svg {
   width: 24px;
   height: 24px;
   fill: currentColor;
 }
-button:hover {
+button {
   cursor: pointer;
-  background: #ffffffcd;
+  background: var(--background, #f0f0f0);
+  color: var(--color, #0f0f0f);
+}
+button:hover {
+  background: var(--background, #f0f0f0cd);
 }
 button:active {
-  background: #ffffff9b;
+  background: var(--background, #f0f0f09b);
 }
 [data-overflow="false"] {
   scrollbar-color: transparent #00000032;
 }
 
-/* props */
+/* attributes */
 [scroll-x] {
   overflow-x: scroll;
 }
