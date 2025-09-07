@@ -35,6 +35,7 @@ export function _styleElement(e, props = {}) {
     fontWeight,
     fontSize,
     color,
+    cssVars = {},
     ...attributes
   } = props;
   const style = {
@@ -59,6 +60,14 @@ export function _styleElement(e, props = {}) {
   for (const [key_camelCase, value] of Object.entries(style)) {
     const key = /** @type {keyof typeof style} */(_camelCaseToKebabCase(key_camelCase));
     if (value != null) e.style[key] = addPx(value);
+  }
+  for (const [key_camelCase, value] of Object.entries(cssVars)) {
+    const key = `--${_camelCaseToKebabCase(key_camelCase)}`;
+    if (value != null) {
+      e.style.setProperty(key, String(value));
+    } else {
+      e.style.removeProperty(key);
+    }
   }
   for (const [key_camelCase, value] of Object.entries(attributes)) {
     const key = _camelCaseToKebabCase(key_camelCase);
@@ -125,8 +134,9 @@ export function rerender() {
  * @param {Component} parent
  * @param {string | undefined} key
  * @param {string} [tagName]
+ * @param {Record<string, any> | undefined} [defaultState]
  * @returns {Component} */
-export function _getChildInfo(parent, key, tagName) {
+export function _getChildInfo(parent, key, tagName, defaultState = {}) {
   if (key == null || key === "") {
     key = `${parent._nextIndex++}-${tagName}`;
   }
@@ -135,7 +145,7 @@ export function _getChildInfo(parent, key, tagName) {
     info = parent.children[key];
   } else {
     info = parent.children[key] = /** @type {Component} */ (/** @type {unknown} */ (
-      { children: {}, element: null, state: {}, _gc: true, _nextChild: null, _nextIndex: 0 }
+      { children: {}, element: null, state: defaultState, _gc: true, _nextChild: null, _nextIndex: 0 }
     ));
   }
   info._gc = parent._gc;
@@ -171,14 +181,16 @@ export function getElement(parent, tagName, props = {}) {
 
 // hooks
 /**
+ * @template T
  * @param {Component} parent
  * @param {string} key
- * @returns {[Record<string, any>, (diff: Record<string, any>) => void]} */
-export function useState(parent, key) {
+ * @param {T} defaultState
+ * @returns {[T, (diff: T) => void]} */
+export function useState(parent, key, defaultState) {
   if (key == null || key === "") throw "key is required in useState()";
-  const info = _getChildInfo(parent, `useState(${key})`);
+  const info = _getChildInfo(parent, `useState(${key})`, undefined, /** @type {any} */(defaultState));
   const { state } = info;
-  /** @param {Record<string, any>} diff */
+  /** @param {T} diff */
   const changeStateAndRerender = (diff) => {
     Object.assign(info.state, diff);
     rerender();

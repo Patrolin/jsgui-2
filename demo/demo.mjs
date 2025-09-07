@@ -3,10 +3,9 @@ import { div, span, button, useState, renderBody } from "../src/jsgui.mjs";
 /**
  * @param {Component} body */
 function App(body) {
-  const [state, changeState] = useState(body, "App");
-  if (state.clicks === undefined) {
-    state.clicks = 0;
-  }
+  const [state, changeState] = useState(body, "App", {
+    clicks: 0,
+  });
 
   const row = div(body, {padding: 8, flex: "x", columnGap: 8});
   span(row, {}, `Clicks: ${state.clicks}`);

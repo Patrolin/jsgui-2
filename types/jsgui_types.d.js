@@ -32,4 +32,5 @@
  * @property {string} [fontWeight]
  * @property {number | string} [fontSize]
  * @property {string} [color]
+ * @property {Record<string, number | string | undefined | null>} [cssVars]
  */

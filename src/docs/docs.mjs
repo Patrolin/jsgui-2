@@ -58,12 +58,11 @@ function headerRight(header) {
 /**
  * @param {Component} body */
 function App(body) {
-  const [state, changeState] = useState(body, "App");
+  const [state, changeState] = useState(body, "App", {
+    lineCount: 2,
+  });
 
   const header = div(body, { width: "100%", height: 56, padding: "0 16px", flex: "x", flexAlign: "justify" });
-  if (state.lineCount == null) {
-    state.lineCount = 2;
-  }
 
   headerLeft(header);
   headerMiddle(header);
@@ -72,16 +71,15 @@ function App(body) {
   const main = div(body, { width: "100%", padding: "8px 24px", flex: "x", flexAlign: "start", columnGap: 16 });
   const mainLeft = div(main, { flex: "y" });
   for (let i = 0; i < state.lineCount; i++) {
-    span(mainLeft, { width: "100%" }, `Lorem ipsum ${state.lineCount + i}`);
+    span(mainLeft, { width: "100%", cssVars: {hi: 13} }, `Lorem ipsum ${i}`);
   }
   for (let i = 0; i < state.lineCount; i++) {
-    span(mainLeft, { width: "100%" }, `Lorem ipsum ${state.lineCount + i}`);
+    span(mainLeft, { width: "100%" }, `Dolor amet ${state.lineCount + i}`);
   }
 
   const mainRight = div(main, { flex: "y" });
   if (button(mainRight, { width: 64, height: 24 }, "Hello").pressed) {
-    state.lineCount += 1;
-    rerender();
+    changeState({ lineCount: state.lineCount + 1 });
   }
 }
 renderBody(App, { background: "#0f0f0f", scrollY: true, color: "white" });
