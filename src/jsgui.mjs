@@ -1,4 +1,3 @@
-// TODO: background: `color-mix(in srgb, #7f7f7f ${100 - percent}%, ${base_color_right} ${percent}%)`
 /**
  * @param {number | string} value
  * @returns string */
@@ -18,47 +17,30 @@ export function _camelCaseToKebabCase(value) {
 export function _styleElement(e, props = {}) {
   const {
     key: _,
-    margin,
-    minWidth,
-    width,
-    maxWidth,
-    minHeight,
-    height,
-    maxHeight,
-    borderRadius,
-    border,
-    background,
-    padding,
-    columnGap,
-    rowGap,
-    fontFamily,
-    fontWeight,
-    fontSize,
-    color,
+    className,
+    // attributes
+    scrollX,
+    scrollY,
+    flex,
+    flexAlign,
+    attributes = {},
     cssVars = {},
-    ...attributes
+    autoSize,
+    ...style
   } = props;
-  const style = {
-    margin,
-    minWidth,
-    width,
-    maxWidth,
-    minHeight,
-    height,
-    maxHeight,
-    borderRadius,
-    border,
-    background,
-    padding,
-    columnGap,
-    rowGap,
-    fontFamily,
-    fontWeight,
-    fontSize,
-    color,
-  };
+  attributes.scrollX = scrollX;
+  attributes.scrollY = scrollY;
+  attributes.flex = flex;
+  attributes.flexAlign = flexAlign;
+  /** @type {any} */(style).flex = autoSize !== null ? String(autoSize) : undefined;
+
+  if (className) {
+    e.className = className;
+  } else {
+    e.removeAttribute("class");
+  }
   for (const [key_camelCase, value] of Object.entries(style)) {
-    const key = /** @type {keyof typeof style} */(_camelCaseToKebabCase(key_camelCase));
+    const key = /** @type {any} */(_camelCaseToKebabCase(key_camelCase));
     if (value != null) e.style[key] = addPx(value);
   }
   for (const [key_camelCase, value] of Object.entries(cssVars)) {
@@ -260,6 +242,32 @@ export function input(parent, type, props) {
  * @returns {Component} */
 export function textarea(parent, props) {
   return getElement(parent, "textarea", props); // TODO: handle events
+}
+
+// router utils
+/**
+ * @param {string} path
+ * @returns {string} */
+export function removeTrailingSlashes(path) {
+  let j = path.length;
+  for (; path[j-1] === "/"; j--) {}
+  return path.slice(0, j);
+}
+/**
+ * @template Route
+ * @param {Route[]} routes
+ * @param {string} [ignorePrefix]
+ * @returns {Route | undefined} */
+export function findMatchingRoute(routes, ignorePrefix) {
+  let currentPath = window.location.pathname;
+  if (ignorePrefix && currentPath.startsWith(ignorePrefix)) {
+    currentPath = currentPath.slice(ignorePrefix.length);
+  }
+  currentPath = removeTrailingSlashes(currentPath);
+  return routes.find(route => {
+    const routePath = /** @type {any}*/(route).path;
+    return removeTrailingSlashes(routePath) === currentPath
+  });
 }
 
 // webgl lib utils

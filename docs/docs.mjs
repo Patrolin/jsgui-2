@@ -1,4 +1,4 @@
-import { div, span, svg, button, input, useState, renderBody, rerender, webgl, glUseProgram, glSetBuffer } from "../jsgui.mjs";
+import { div, span, svg, button, input, useState, renderBody, rerender, webgl, glUseProgram, glSetBuffer } from "src/jsgui.mjs";
 
 /**
  * @param {Component} header */
