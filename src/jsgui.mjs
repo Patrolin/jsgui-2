@@ -139,7 +139,7 @@ export function _getChildInfo(parent, key, tagName, defaultState = {}) {
  * @param {Component} info */
 function _appendOrMoveElement(parent, info) {
   const element = info.element;
-  if (element == null) return; // NOTE: appending a fragment does nothing
+  if (element == null) return; // NOTE: things like useState() store data, but have no element
 
   info._nextChild = /** @type {HTMLElement | null} */(element.firstElementChild);
   if (element === parent._nextChild) {
