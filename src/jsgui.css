@@ -50,12 +50,15 @@ h1, h2, h3, h4, h5, h6, span {
   line-height: round(down, calc(var(--fontSize) * 1.4));
 }
 
-/* components */
+/* svg */
 svg {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
+  padding: 4px;
   fill: currentColor;
 }
+
+/* button */
 button {
   cursor: pointer;
   background: var(--background, #f0f0f0);
