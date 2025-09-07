@@ -82,4 +82,4 @@ function App(body) {
     changeState({ lineCount: state.lineCount + 1 });
   }
 }
-renderBody(App, { background: "#0f0f0f", scrollY: true, color: "white" });
+renderBody(App, { scrollY: true });

@@ -13,4 +13,4 @@ function App(body) {
     changeState({clicks: state.clicks + 1});
   }
 }
-renderBody(App, { background: "#0f0f0f", scrollY: true, color: "white" });
+renderBody(App, { scrollY: true });
