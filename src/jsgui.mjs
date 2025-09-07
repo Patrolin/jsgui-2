@@ -185,17 +185,12 @@ export function getElement(parent, tagName, props = {}) {
  * @param {Component} parent
  * @param {string} key
  * @param {T} defaultState
- * @returns {[T, (diff: T) => void]} */
+ * @returns {T} */
 export function useState(parent, key, defaultState) {
   if (key == null || key === "") throw "key is required in useState()";
   const info = _getChildInfo(parent, `useState(${key})`, undefined, /** @type {any} */(defaultState));
   const { state } = info;
-  /** @param {T} diff */
-  const changeStateAndRerender = (diff) => {
-    Object.assign(info.state, diff);
-    rerender();
-  };
-  return [state, changeStateAndRerender];
+  return state;
 }
 
 // components

@@ -58,7 +58,7 @@ function headerRight(header) {
 /**
  * @param {Component} body */
 function App(body) {
-  const [state, changeState] = useState(body, "App", {
+  const state = useState(body, "App", {
     lineCount: 2,
   });
 
@@ -79,7 +79,8 @@ function App(body) {
 
   const mainRight = div(main, { flex: "y" });
   if (button(mainRight, { width: 64, height: 24 }, "Hello").pressed) {
-    changeState({ lineCount: state.lineCount + 1 });
+    state.lineCount += 1
+    rerender();
   }
 }
 renderBody(App, { scrollY: true });

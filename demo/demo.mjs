@@ -1,16 +1,17 @@
-import { div, span, button, useState, renderBody } from "../src/jsgui.mjs";
+import { div, span, button, useState, renderBody, rerender } from "../src/jsgui.mjs";
 
 /**
  * @param {Component} body */
 function App(body) {
-  const [state, changeState] = useState(body, "App", {
+  const state = useState(body, "App", {
     clicks: 0,
   });
 
   const row = div(body, {padding: 8, flex: "x", columnGap: 8});
   span(row, {}, `Clicks: ${state.clicks}`);
   if (button(row, {margin: "0"}, "Press me!").pressed) {
-    changeState({clicks: state.clicks + 1});
+    state.clicks += 1
+    rerender();
   }
 }
 renderBody(App, { scrollY: true });
