@@ -34,3 +34,42 @@
  * @property {string} [color]
  * @property {Record<string, number | string | undefined | null>} [cssVars]
  */
+
+// webgl
+/**
+ * @typedef {any[] | undefined} WebGLError
+ */
+/**
+ * @typedef {Object} GLBufferInfo
+ * @property {number} location
+ * @property {number} count // can be >4 for matrices
+ * @property {GLenum} type // gl.FLOAT | ...
+ * @property {WebGLBuffer} bufferIndex
+ */
+/**
+ * @typedef {Object} GLProgramInfo
+ * @property {WebGLProgram} program
+ * @property {string} vertex
+ * @property {string} fragment
+ * @property {WebGLVertexArrayObject} vao
+ * @property {Record<string, GLBufferInfo>} buffers
+ * @property {Record<string, WebGLUniformLocation>} uniforms
+ */
+/**
+ * @typedef {Object} WebGLState
+ * @property {WebGL2RenderingContext} gl
+ * @property {Record<string, GLProgramInfo>} programs
+ * @property {DOMRect} rect
+ * @property {boolean} didCompile
+ */
+/**
+ * @typedef {Object} GLProgramDescriptor
+ * @property {string} vertex
+ * @property {string} fragment
+ */
+/**
+ * @typedef {Object} WebGLProps
+ * @property {Record<string, GLProgramDescriptor>} programs
+ * @property {number} [renderResolutionMultiplier]
+ * @property {(state: WebGLState) => void} render
+ */
