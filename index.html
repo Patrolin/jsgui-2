@@ -1,5 +1,725 @@
 <!DOCTYPE html>
 <head>
-  <link rel="stylesheet" href="src/jsgui.css" />
-  <script type="module" src="docs/docs.mjs"></script>
-</head>
+<style>
+/* fixes for default browser styles */
+:root {
+  --fontSize: 14px;
+}
+* {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  outline: none;
+  border: none;
+  background: none;
+  display: inline-block;
+  overflow: hidden;
+  color: inherit;
+  line-height: unset;
+  font-size: var(--font-size);
+  font-family: inherit;
+  font-weight: inherit;
+}
+head, head * {
+  display: none;
+}
+html, body {
+  width: 100%;
+  height: 100%;
+}
+body {
+  background: #0f0f0f;
+  color: #f0f0f0;
+}
+
+/* font-size */
+h1 {
+  --font-size: 20px;
+  font-weight: 700;
+}
+h2 {
+  --font-size: 16px;
+  font-weight: 500;
+}
+body, h3 {
+  --font-size: 14px;
+  font-weight: 400;
+}
+h4, h5, h6 {
+  --font-size: 12px;
+  font-weight: 400;
+}
+h1, h2, h3, h4, h5, h6, span {
+  line-height: round(down, calc(var(--fontSize) * 1.4));
+}
+
+/* svg */
+svg {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  fill: currentColor;
+}
+
+/* button */
+button {
+  cursor: pointer;
+  background: var(--background, #f0f0f0);
+  color: var(--color, #0f0f0f);
+}
+button:hover {
+  background: var(--background, #f0f0f0cd);
+}
+button:active {
+  background: var(--background, #f0f0f09b);
+}
+[data-overflow="false"] {
+  scrollbar-color: transparent #00000032;
+}
+
+/* attributes */
+[scroll-x] {
+  overflow-x: scroll;
+}
+[scroll-y] {
+  overflow-y: scroll;
+}
+
+[flex] {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+[flex="x"] {
+  flex-direction: row;
+}
+[flex="x-reverse"] {
+  flex-direction: row-reverse;
+}
+[flex="y"] {
+  flex-direction: column;
+}
+[flex="y-reverse"] {
+  flex-direction: column-reverse;
+}
+
+[flex-align="center"] {
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+[flex-align="justify"] {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+[flex-align="start"] {
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+[flex-align="scroll"] {
+  justify-content: flex-start;
+  align-items: stretch;
+}
+[flex="^x"][flex-align="scroll"] {
+  overflow-x: scroll;
+}
+[flex="^y"][flex-align="scroll"] {
+  overflow-y: scroll;
+}
+</style>
+<script>
+function headerLeft(header) {
+  svg(
+    header,
+    { fontSize: 24 },
+    `<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" focusable="false"><path d="M21 6H3V5h18v1zm0 5H3v1h18v-1zm0 6H3v1h18v-1z"></path></svg>`
+  );
+}
+function headerMiddle(header) {
+  const searchWrapper = div(header, { flex: "x" });
+  input(searchWrapper, "text", {
+    height: 40,
+    borderRadius: "20px 0 0 20px",
+    border: "1px solid rgb(48, 48, 48)",
+    background: "none",
+    padding: "0 0 0 16px",
+    fontFamily: "Roboto, Arial, sans-serif",
+    fontSize: 16,
+    color: "white",
+  });
+  const searchButton = div(searchWrapper, {
+    width: 64,
+    height: 40,
+    borderRadius: "0 20px 20px 0",
+    background: "rgb(48, 48, 48)",
+    flex: "x",
+  });
+  svg(
+    searchButton,
+    { fontSize: 24 },
+    `<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" height="24" viewBox="0 0 24 24" width="24" focusable="false"><path clip-rule="evenodd" d="M16.296 16.996a8 8 0 11.707-.708l3.909 3.91-.707.707-3.909-3.909zM18 11a7 7 0 00-14 0 7 7 0 1014 0z" fill-rule="evenodd"></path></svg>`
+  );
+
+  const voiceButton = div(searchWrapper, {
+    margin: "0 0 0 12px",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    background: "rgb(48, 48, 48)",
+    flex: "x",
+  });
+  svg(
+    voiceButton,
+    { fontSize: 24 },
+    `<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" focusable="false"><path d="M12 3c-1.66 0-3 1.37-3 3.07v5.86c0 1.7 1.34 3.07 3 3.07s3-1.37 3-3.07V6.07C15 4.37 13.66 3 12 3zm6.5 9h-1c0 3.03-2.47 5.5-5.5 5.5S6.5 15.03 6.5 12h-1c0 3.24 2.39 5.93 5.5 6.41V21h2v-2.59c3.11-.48 5.5-3.17 5.5-6.41z"></path></svg>`
+  );
+}
+function headerRight(header) {
+  div(header);
+}
+function App(body) {
+  const state = useState(body, "App", {
+    lineCount: 2,
+  });
+
+  const header = div(body, { width: "100%", height: 56, padding: "0 16px", flex: "x", flexAlign: "justify" });
+
+  headerLeft(header);
+  headerMiddle(header);
+  headerRight(header);
+
+  const main = div(body, { width: "100%", padding: "8px 24px", flex: "x", flexAlign: "start", columnGap: 16 });
+  const mainLeft = div(main, { flex: "y" });
+  for (let i = 0; i < state.lineCount; i++) {
+    span(mainLeft, `Lorem ipsum ${i}`, { width: "100%" });
+  }
+  for (let i = 0; i < state.lineCount; i++) {
+    span(mainLeft, `Dolor amet ${state.lineCount + i}`, { width: "100%" });
+  }
+
+  const mainRight = div(main, { flex: "y" });
+  if (button(mainRight, "Hello", { width: 64, height: 24 }).pressed) {
+    state.lineCount += 1
+    rerender();
+  }
+  webgl(mainRight, {width: 400, height: 400}, {
+    programs: {
+      gradient: {
+        vertex: `
+          in vec2 v_position;
+          in vec3 v_color;
+          out vec3 f_color;
+          void main() {
+            gl_Position = vec4(v_position, 0, 1);
+            f_color = v_color;
+          }
+        `,
+        fragment: `
+          in vec3 f_color;
+          out vec4 out_color;
+          void main() {
+            out_color = vec4(f_color, 1);
+          }
+        `,
+      },
+      flatColor: {
+        vertex: `
+          in vec2 v_position;
+          void main() {
+            gl_Position = vec4(v_position, 0, 1);
+          }
+        `,
+        fragment: `
+          uniform mat4x4 u_mat;
+          uniform vec3 u_color;
+          out vec4 out_color;
+          void main() {
+            out_color = u_mat * vec4(u_color, 1);
+          }
+        `,
+      },
+    },
+    render: ({gl, programs}) => {
+      // draw blue background
+      const flatColor = (programs.flatColor);
+      glUseProgram(gl, flatColor);
+      glSetBuffer(gl,
+        (flatColor.buffers.v_position),
+        new Float32Array([
+        -1, -1,
+        -1, +1,
+        +1, +1,
+        +1, -1,
+      ]));
+      gl.uniformMatrix4fv(
+        (flatColor.uniforms.u_mat),
+        false, [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+      ]);
+      gl.uniform3f(
+        (flatColor.uniforms.u_color),
+        0, 0.5, 1);
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+
+      // draw rainbow triangle
+      const gradient = (programs.gradient);
+      glUseProgram(gl, gradient);
+      glSetBuffer(gl,
+        (gradient.buffers.v_position),
+        new Float32Array([
+        0.0,  0.6,
+       -0.5, -0.6,
+        0.5, -0.6,
+      ]));
+      glSetBuffer(gl,
+        (gradient.buffers.v_color),
+        new Float32Array([
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+      ]));
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+  })
+}
+renderBody(App, { scrollY: true });
+function addPx(value) {
+  return typeof value === "string" ? value : `${value}px`;
+}
+function _camelCaseToKebabCase(value) {
+  return [...value.matchAll(/[a-zA-Z][a-z]*/g)].join("-").toLowerCase();
+}
+
+function _styleElement(e, props = {}) {
+  const {
+    key: _,
+    className,
+    // attributes
+    scrollX,
+    scrollY,
+    flex,
+    flexAlign,
+    attributes = {},
+    cssVars = {},
+    autoSize,
+    ...style
+  } = props;
+  attributes.scrollX = scrollX;
+  attributes.scrollY = scrollY;
+  attributes.flex = flex;
+  attributes.flexAlign = flexAlign;
+  (style).flex = autoSize !== null ? String(autoSize) : undefined;
+
+  if (className) {
+    e.className = className;
+  } else {
+    e.removeAttribute("class");
+  }
+  for (const [key_camelCase, value] of Object.entries(style)) {
+    const key = (_camelCaseToKebabCase(key_camelCase));
+    if (value != null) e.style[key] = addPx(value);
+  }
+  for (const [key_camelCase, value] of Object.entries(cssVars)) {
+    const key = `--${_camelCaseToKebabCase(key_camelCase)}`;
+    if (value != null) {
+      e.style.setProperty(key, String(value));
+    } else {
+      e.style.removeProperty(key);
+    }
+  }
+  for (const [key_camelCase, value] of Object.entries(attributes)) {
+    const key = _camelCaseToKebabCase(key_camelCase);
+    if (value != null) e.setAttribute(key, String(value));
+    else e.removeAttribute(key);
+  }
+}
+function _removeUnusedComponents(info, current_gc) {
+  for (let [key, child_info] of Object.entries(info.children)) {
+    _removeUnusedComponents(child_info, current_gc);
+    if (child_info._gc !== current_gc) {
+      console.log("ayaya.DELETE", info, current_gc);
+      child_info.element.remove();
+      delete info.children[key];
+    }
+  }
+}
+function _recomputeOverflow() {
+  for (let e of document.querySelectorAll("*")) {
+    if (e.hasAttribute("scroll-x") || e.hasAttribute("scroll-y")) {
+      const dataOverflowX = e.scrollWidth > e.clientWidth;
+      const dataOverflowY = e.scrollHeight > e.clientHeight;
+      e.setAttribute("data-overflow", String(dataOverflowX || dataOverflowY));
+    }
+  }
+}
+
+const _root_info = (({ children: {}, element: null, state: {}, _gc: true, _nextChild: null, _nextIndex: 0 }));
+function renderBody(Root, bodyProps) {
+  window.addEventListener("DOMContentLoaded", () => {
+    _root_info.element = document.body;
+    _root_info.state = { Root, bodyProps };
+    _renderNow();
+  });
+}
+function _renderNow() {
+  // reset info
+  _root_info._gc = !_root_info._gc;
+  _root_info._nextIndex = 0;
+  _root_info._nextChild = (_root_info.element.firstElementChild);
+  // render Root component
+  const { Root, bodyProps } = _root_info.state;
+  _styleElement(_root_info.element, bodyProps);
+  Root(_root_info);
+  _removeUnusedComponents(_root_info, _root_info._gc);
+  _recomputeOverflow();
+}
+function rerender() {
+  if (!_root_info.state.willRerender) {
+    _root_info.state.willRerender = true;
+    requestAnimationFrame(() => {
+      _root_info.state.willRerender = false;
+      _renderNow();
+    });
+  }
+}
+function _getChildInfo(parent, key, tagName, defaultState = {}) {
+  if (key == null || key === "") {
+    key = `${parent._nextIndex++}-${tagName}`;
+  }
+  let info;
+  if (key in parent.children) {
+    info = (parent.children[key]);
+  } else {
+    info = parent.children[key] =  ( (
+      { children: {}, element: null, state: defaultState, _gc: true, _nextChild: null, _nextIndex: 0 }
+    ));
+  }
+  info._gc = parent._gc;
+  info._nextIndex = 0;
+  return info;
+}
+function _appendOrMoveElement(parent, info) {
+  const element = info.element;
+  if (element == null) return; // NOTE: things like useState() store data, but have no element
+
+  info._nextChild = (element.firstElementChild);
+  if (element === parent._nextChild) {
+    parent._nextChild = (element.nextElementSibling);
+  } else {
+    parent.element.insertBefore(element, parent._nextChild);
+  }
+}
+function getElement(parent, tagName, props = {}) {
+  const info = _getChildInfo(parent, props.key, tagName);
+  if (info.element == null) info.element = document.createElement(tagName);
+  _styleElement(info.element, props);
+  _appendOrMoveElement(parent, info);
+  return info;
+}
+
+// hooks
+function useState(parent, key, defaultState) {
+  if (key == null || key === "") throw "key is required in useState()";
+  const info = _getChildInfo(parent, `useState(${key})`, undefined, (defaultState));
+  const { state } = info;
+  return state;
+}
+
+// components
+function div(parent, props) {
+  return getElement(parent, "div", props);
+}
+function span(parent, text, props) {
+  const info = getElement(parent, "span", props);
+  info.element.textContent = (text);
+  return info;
+}
+function svg(parent, props, innerHTML) {
+  const info = _getChildInfo(parent, props.key, "svg");
+  if (info.state.prevInnerHTML !== innerHTML) {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = innerHTML;
+    info.element = (tmp.children[0]);
+    info.state.prevInnerHTML = innerHTML;
+  }
+  _styleElement(info.element, props);
+  _appendOrMoveElement(parent, info);
+  return info;
+}
+function button(parent, text, props) {
+  const info = getElement(parent, "button", { flex: "x", ...props });
+  if (text != null) span(info, text, { key: "button-text" }); // NOTE: browsers are stupid and don't respect textContent on buttons
+  const pressed = info.state.pressed;
+  info.state.pressed = false;
+  info.element.onclick = () => {
+    info.state.pressed = true;
+    rerender();
+  };
+  return { info, pressed };
+}
+function input(parent, type, props) {
+  const info = getElement(parent, "input", props); // TODO: handle events
+  info.element.setAttribute("type", type);
+  return info;
+}
+function textarea(parent, props) {
+  return getElement(parent, "textarea", props); // TODO: handle events
+}
+
+// router utils
+function removeTrailingSlashes(path) {
+  let j = path.length;
+  for (; path[j-1] === "/"; j--) {}
+  return path.slice(0, j);
+}
+function findMatchingRoute(routes, ignorePrefix) {
+  let currentPath = window.location.pathname;
+  if (ignorePrefix && currentPath.startsWith(ignorePrefix)) {
+    currentPath = currentPath.slice(ignorePrefix.length);
+  }
+  currentPath = removeTrailingSlashes(currentPath);
+  return routes.find(route => {
+    const routePath = (route).path;
+    return removeTrailingSlashes(routePath) === currentPath
+  });
+}
+
+// webgl lib utils
+function glGetShaderLog(gl, shader, shaderCode) {
+  const shaderLines = shaderCode.split("\n");
+  const rawShaderLog = gl.getShaderInfoLog(shader) ?? "";
+  let prevLineNumberToShow = (null);
+  let acc = "";
+  for (let logLine of rawShaderLog.split("\n")) {
+    const match = logLine.match(/^ERROR: \d+:(\d+)/);
+    let lineNumberToShow = (null);
+    if (match != null) {
+      lineNumberToShow = +(match[1]) - 1;
+    }
+    if (prevLineNumberToShow != null && prevLineNumberToShow !== lineNumberToShow) {
+      const line = (shaderLines[prevLineNumberToShow] ?? "").trim()
+      prevLineNumberToShow = lineNumberToShow;
+      acc += `  ${line}\n${logLine}\n`;
+    } else {
+      prevLineNumberToShow = lineNumberToShow;
+      acc += `${logLine}\n`;
+    }
+  }
+  return acc;
+}
+function glCompileShader(gl, program, shaderType, shaderCode) {
+  const shader = gl.createShader(shaderType);
+  while (1) {
+    if (!shader) break;
+    gl.shaderSource(shader, shaderCode);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) break;
+    gl.attachShader(program, shader);
+    return;
+  }
+  const ShaderTypeName = ({
+    [gl.VERTEX_SHADER]: ".VERTEX_SHADER",
+    [gl.FRAGMENT_SHADER]: ".FRAGMENT_SHADER",
+  });
+  const shaderLog = glGetShaderLog(gl, (shader), shaderCode);
+  return [
+    `Could not compile shader:\n${shaderLog}`,
+    {
+      program,
+      shaderType: ShaderTypeName[shaderType] ?? shaderType,
+      shaderCode,
+      shader,
+    }
+  ]
+}
+function glCompileProgram(gl, programInfo) {
+  const {program, vertex, fragment} = programInfo;
+  let error = glCompileShader(gl, program, gl.VERTEX_SHADER, vertex);
+  if (error) return error;
+
+  error = glCompileShader(gl, program, gl.FRAGMENT_SHADER, fragment);
+  if (error) return error;
+
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    const programLog = gl.getProgramInfoLog(program);
+    return [`Error linking shader program:\n${programLog}`, {program}]
+  }
+  gl.useProgram(program);
+}
+function glDecodeVertexAttributeType(gl, flatType) {
+  switch (flatType) {
+  /* WebGL */
+  case gl.FLOAT:
+    return [gl.FLOAT, 1];
+  case gl.FLOAT_VEC2:
+    return [gl.FLOAT, 2];
+  case gl.FLOAT_VEC3:
+    return [gl.FLOAT, 3];
+  case gl.FLOAT_VEC4:
+    return [gl.FLOAT, 4];
+  case gl.FLOAT_MAT2:
+    return [gl.FLOAT, 4];
+  case gl.FLOAT_MAT3:
+    return [gl.FLOAT, 9];
+  case gl.FLOAT_MAT4:
+    return [gl.FLOAT, 16];
+  // NOTE: non-square matrices are only valid as uniforms
+  /* WebGL2 */
+  case gl.INT:
+    return [gl.INT, 1];
+  case gl.INT_VEC2:
+    return [gl.INT, 2];
+  case gl.INT_VEC3:
+    return [gl.INT, 3];
+  case gl.INT_VEC4:
+    return [gl.INT, 4];
+  case gl.UNSIGNED_INT:
+    return [gl.UNSIGNED_INT, 1];
+  case gl.UNSIGNED_INT_VEC2:
+    return [gl.UNSIGNED_INT, 2];
+  case gl.UNSIGNED_INT_VEC3:
+    return [gl.UNSIGNED_INT, 3];
+  case gl.UNSIGNED_INT_VEC4:
+    return [gl.UNSIGNED_INT, 4];
+  }
+  console.error('Uknown vertexAttribute type:', {flatType});
+  return [-1, -1];
+}
+// webgl user utils
+function glUseProgram(gl, programInfo) {
+  gl.useProgram(programInfo.program);
+  gl.bindVertexArray(programInfo.vao);
+}
+function glSetBuffer(gl, bufferInfo, data) {
+  const {location, count, type, bufferIndex} = bufferInfo;
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufferIndex);
+  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+
+  const FLOAT_SIZE = 4; // we are assuming `#precision highp float;`
+  if (type === gl.FLOAT) {
+    let currentLocation = location;
+    let remainingCount = count;
+    const stride = count * FLOAT_SIZE;
+    let currentOffset = 0;
+    while (remainingCount >= 4) {
+      gl.enableVertexAttribArray(currentLocation);
+      gl.vertexAttribPointer(currentLocation++, 4, type, false, stride, currentOffset);
+      remainingCount -= 4;
+      currentOffset += 4 * FLOAT_SIZE;
+    }
+    if (remainingCount > 0) {
+      gl.enableVertexAttribArray(currentLocation);
+      gl.vertexAttribPointer(currentLocation++, remainingCount, type, false, stride, currentOffset);
+    }
+  } else {
+    gl.enableVertexAttribArray(location);
+    gl.vertexAttribIPointer(location, count, type, 0, 0);
+  }
+}
+
+// webgl component
+function webgl(parent, props, webglProps) {
+  const {
+    programs,
+    renderResolutionMultiplier = 1.0,
+    render = ({gl}) => {
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }} = webglProps;
+  const info = getElement(parent, "canvas", props);
+  const node = (info.element);
+  // TODO: type check the state
+  const state = useState(info, "webgl", ({
+    gl: null,
+    programs: null,
+    rect: new DOMRect(),
+    didCompile: false,
+  }));
+  if (state.gl == null) {
+    const gl = node.getContext("webgl2");
+    if (!gl) return;
+    state.gl = gl;
+    // init shaders
+    state.programs = {};
+    const DEFAULT_SHADER_VERSION = "#version 300 es\n";
+    const DEFAULT_FLOAT_PRECISION = "precision highp float;\n"
+        const addShaderHeader = (headerCode, shaderCode) => {
+      return shaderCode.trimStart().startsWith("#version") ? shaderCode : headerCode + shaderCode
+    }
+    for (let [k, _programInfo] of Object.entries(programs)) {
+      const programInfo = (_programInfo);
+      state.programs[k] = programInfo;
+      // compile
+      programInfo.program = gl.createProgram();
+      programInfo.vertex = addShaderHeader(DEFAULT_SHADER_VERSION, programInfo.vertex);
+      programInfo.fragment = addShaderHeader(DEFAULT_SHADER_VERSION + DEFAULT_FLOAT_PRECISION, programInfo.fragment);
+      let error = glCompileProgram(gl, programInfo);
+      if (error) {
+        console.error(...error);
+        break;
+      }
+      state.didCompile = true;
+      // init vertex buffers
+      programInfo.vao = gl.createVertexArray(); // vao means vertexBuffer[]
+      gl.bindVertexArray(programInfo.vao);
+      programInfo.buffers = {};
+      const vertexBufferCount = gl.getProgramParameter(programInfo.program, gl.ACTIVE_ATTRIBUTES);
+      for (let i = 0; i < vertexBufferCount; i++) {
+        const vertexAttribute = gl.getActiveAttrib(programInfo.program, i);
+        if (vertexAttribute == null) {
+          console.error(`Couldn't get vertexAttribute:`, {i});
+          continue
+        }
+        const vertexAttributeLocation = gl.getAttribLocation(programInfo.program, vertexAttribute.name);
+        if (vertexAttributeLocation == null) {
+          console.error(`Couldn't get vertexAttribute location:`, {i, vertexAttribute});
+          continue
+        }
+        const [type, count] = glDecodeVertexAttributeType(gl, vertexAttribute.type);
+        programInfo.buffers[vertexAttribute.name] = {
+          location: vertexAttributeLocation,
+          count,
+          type,
+          bufferIndex: gl.createBuffer(),
+        };
+      }
+      // get uniform locations
+      programInfo.uniforms = {};
+      const uniformCount = gl.getProgramParameter(programInfo.program, gl.ACTIVE_UNIFORMS);
+      for (let i = 0; i < uniformCount; i++) {
+        const uniform = gl.getActiveUniform(programInfo.program, i);
+        if (uniform == null) {
+          console.error(`Couldn't get uniform:`, {i});
+          continue
+        }
+        const uniformLocation = gl.getUniformLocation(programInfo.program, uniform.name);
+        if (uniformLocation == null) {
+          console.error(`Couldn't get uniform location:`, {i, uniform});
+          continue
+        }
+        programInfo.uniforms[uniform.name] = uniformLocation;
+      }
+    }
+  }
+
+  // autosize canvas
+  const rect = node.getBoundingClientRect();
+  rect.width *= renderResolutionMultiplier;
+  rect.height *= renderResolutionMultiplier;
+  node.width = rect.width;
+  node.height = rect.height;
+  state.rect = rect;
+  // render
+  const {gl, didCompile} = state;
+  if (didCompile && gl != null) {
+    gl.viewport(0, 0, rect.width, rect.height);
+    render(state);
+  }
+}
+</script>

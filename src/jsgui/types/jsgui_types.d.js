@@ -1,5 +1,4 @@
-// TODO: className, events
-/**
+/** TODO: className, events
  * @typedef {Object} Component
  * @property {Record<string, Component>} children
  * @property {HTMLElement} element
@@ -38,8 +37,7 @@
  * @property {Record<string, number | string | undefined | null>} [cssVars]
  */
 
-// webgl
-/**
+/** webgl
  * @typedef {any[] | undefined} WebGLError
  */
 /**
