@@ -8,32 +8,35 @@
  * @property {number} _nextIndex
  */
 /**
- * @typedef {Record<string, number | string | boolean | undefined | null> & {scrollX?: boolean; scrollY?: boolean; flex?: "x" | "x-reverse" | "y" | "y-reverse"; flexAlign?: "center" | "justify" | "start" | "scroll"}} HTMLAttributes
-*/
+ * @typedef {Record<string, string | number | boolean | undefined | null> & {scrollX?: boolean; scrollY?: boolean; flex?: "x" | "x-reverse" | "y" | "y-reverse"; flexAlign?: "center" | "justify" | "start" | "scroll"}} HTMLAttributes
+ */
+/**
+ * @typedef {Record<string, string | number | undefined | null>} CSSVars
+ */
 /**
  * @typedef {Object} HTMLProps
  * @property {string} [key] - required if you want to dynamically add/remove components with state
- * @property {number | string} [margin]
- * @property {number | string} [minWidth]
- * @property {number | string} [width]
- * @property {number | string} [maxWidth]
- * @property {number | string} [minHeight]
- * @property {number | string} [height]
- * @property {number | string} [maxHeight]
- * @property {number | string} [flex]
- * @property {number | string} [borderRadius]
+ * @property {string | number} [margin]
+ * @property {string | number} [minWidth]
+ * @property {string | number} [width]
+ * @property {string | number} [maxWidth]
+ * @property {string | number} [minHeight]
+ * @property {string | number} [height]
+ * @property {string | number} [maxHeight]
+ * @property {string | number} [flex]
+ * @property {string | number} [borderRadius]
  * @property {string} [border]
  * @property {string} [background]
- * @property {number | string} [padding]
- * @property {number | string} [columnGap]
- * @property {number | string} [rowGap]
+ * @property {string | number} [padding]
+ * @property {string | number} [columnGap]
+ * @property {string | number} [rowGap]
  * @property {string} [fontFamily]
  * @property {string} [fontWeight]
- * @property {number | string} [fontSize]
+ * @property {string | number} [fontSize]
  * @property {string} [color]
  * @property {string} [className]
  * @property {HTMLAttributes} [attributes]
- * @property {Record<string, number | string | undefined | null>} [cssVars]
+ * @property {CSSVars} [cssVars]
  */
 
 /** webgl
