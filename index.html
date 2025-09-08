@@ -30,6 +30,7 @@ html, body {
 body {
   background: #0f0f0f;
   color: #f0f0f0;
+  font-family: Roboto, Arial, sans-serif;
 }
 
 /* font-size */
@@ -138,7 +139,7 @@ function headerLeft(header) {
   );
 }
 function headerMiddle(header) {
-  const searchWrapper = div(header, { flex: "x" });
+  const searchWrapper = div(header, { attributes: {flex: "x"} });
   input(searchWrapper, "text", {
     height: 40,
     borderRadius: "20px 0 0 20px",
@@ -154,7 +155,7 @@ function headerMiddle(header) {
     height: 40,
     borderRadius: "0 20px 20px 0",
     background: "rgb(48, 48, 48)",
-    flex: "x",
+    attributes: {flex: "x"},
   });
   svg(
     searchButton,
@@ -168,7 +169,7 @@ function headerMiddle(header) {
     height: 40,
     borderRadius: 20,
     background: "rgb(48, 48, 48)",
-    flex: "x",
+    attributes: {flex: "x"},
   });
   svg(
     voiceButton,
@@ -184,14 +185,14 @@ function App(body) {
     lineCount: 2,
   });
 
-  const header = div(body, { width: "100%", height: 56, padding: "0 16px", flex: "x", flexAlign: "justify" });
+  const header = div(body, { width: "100%", height: 56, padding: "0 16px", attributes: {flex: "x", flexAlign: "justify"} });
 
   headerLeft(header);
   headerMiddle(header);
   headerRight(header);
 
-  const main = div(body, { width: "100%", padding: "8px 24px", flex: "x", flexAlign: "start", columnGap: 16 });
-  const mainLeft = div(main, { flex: "y" });
+  const main = div(body, { width: "100%", padding: "8px 24px", attributes: {flex: "x", flexAlign: "start"}, columnGap: 16 });
+  const mainLeft = div(main, { attributes: {flex: "y"} });
   for (let i = 0; i < state.lineCount; i++) {
     span(mainLeft, `Lorem ipsum ${i}`, { width: "100%" });
   }
@@ -199,7 +200,7 @@ function App(body) {
     span(mainLeft, `Dolor amet ${state.lineCount + i}`, { width: "100%" });
   }
 
-  const mainRight = div(main, { flex: "y" });
+  const mainRight = div(main, { attributes: {flex: "y"} });
   if (button(mainRight, "Hello", { width: 64, height: 24 }).pressed) {
     state.lineCount += 1
     rerender();
@@ -287,7 +288,7 @@ function App(body) {
     }
   })
 }
-renderBody(App, { scrollY: true });
+renderBody(App, { attributes: {scrollY: true} });
 function addPx(value) {
   return typeof value === "string" ? value : `${value}px`;
 }
@@ -300,20 +301,12 @@ function _styleElement(e, props = {}) {
     key: _,
     className,
     // attributes
-    scrollX,
-    scrollY,
-    flex,
-    flexAlign,
     attributes = {},
     cssVars = {},
-    autoSize,
+    flex,
     ...style
   } = props;
-  attributes.scrollX = scrollX;
-  attributes.scrollY = scrollY;
-  attributes.flex = flex;
-  attributes.flexAlign = flexAlign;
-  (style).flex = autoSize !== null ? String(autoSize) : undefined;
+  (style).flex = flex != null ? String(flex) : undefined;
 
   if (className) {
     e.className = className;
@@ -452,7 +445,7 @@ function svg(parent, props, innerHTML) {
   return info;
 }
 function button(parent, text, props) {
-  const info = getElement(parent, "button", { flex: "x", ...props });
+  const info = getElement(parent, "button", { attributes: {flex: "x", ...props?.attributes}, ...props });
   if (text != null) span(info, text, { key: "button-text" }); // NOTE: browsers are stupid and don't respect textContent on buttons
   const pressed = info.state.pressed;
   info.state.pressed = false;

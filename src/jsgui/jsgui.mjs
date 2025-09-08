@@ -19,20 +19,12 @@ export function _styleElement(e, props = {}) {
     key: _,
     className,
     // attributes
-    scrollX,
-    scrollY,
-    flex,
-    flexAlign,
     attributes = {},
     cssVars = {},
-    autoSize,
+    flex,
     ...style
   } = props;
-  attributes.scrollX = scrollX;
-  attributes.scrollY = scrollY;
-  attributes.flex = flex;
-  attributes.flexAlign = flexAlign;
-  /** @type {any} */(style).flex = autoSize !== null ? String(autoSize) : undefined;
+  /** @type {any} */(style).flex = flex != null ? String(flex) : undefined;
 
   if (className) {
     e.className = className;
@@ -216,7 +208,7 @@ export function svg(parent, props, innerHTML) {
  * @param {string} [text]
  * @returns {{info: Component, pressed: boolean}} */
 export function button(parent, text, props) {
-  const info = getElement(parent, "button", { flex: "x", ...props });
+  const info = getElement(parent, "button", { attributes: {flex: "x", ...props?.attributes}, ...props });
   if (text != null) span(info, text, { key: "button-text" }); // NOTE: browsers are stupid and don't respect textContent on buttons
   const pressed = info.state.pressed;
   info.state.pressed = false;

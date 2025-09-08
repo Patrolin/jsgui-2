@@ -12,7 +12,7 @@ function headerLeft(header) {
 /**
  * @param {Component} header */
 function headerMiddle(header) {
-  const searchWrapper = div(header, { flex: "x" });
+  const searchWrapper = div(header, { attributes: {flex: "x"} });
   input(searchWrapper, "text", {
     height: 40,
     borderRadius: "20px 0 0 20px",
@@ -28,7 +28,7 @@ function headerMiddle(header) {
     height: 40,
     borderRadius: "0 20px 20px 0",
     background: "rgb(48, 48, 48)",
-    flex: "x",
+    attributes: {flex: "x"},
   });
   svg(
     searchButton,
@@ -42,7 +42,7 @@ function headerMiddle(header) {
     height: 40,
     borderRadius: 20,
     background: "rgb(48, 48, 48)",
-    flex: "x",
+    attributes: {flex: "x"},
   });
   svg(
     voiceButton,
@@ -62,14 +62,14 @@ function App(body) {
     lineCount: 2,
   });
 
-  const header = div(body, { width: "100%", height: 56, padding: "0 16px", flex: "x", flexAlign: "justify" });
+  const header = div(body, { width: "100%", height: 56, padding: "0 16px", attributes: {flex: "x", flexAlign: "justify"} });
 
   headerLeft(header);
   headerMiddle(header);
   headerRight(header);
 
-  const main = div(body, { width: "100%", padding: "8px 24px", flex: "x", flexAlign: "start", columnGap: 16 });
-  const mainLeft = div(main, { flex: "y" });
+  const main = div(body, { width: "100%", padding: "8px 24px", attributes: {flex: "x", flexAlign: "start"}, columnGap: 16 });
+  const mainLeft = div(main, { attributes: {flex: "y"} });
   for (let i = 0; i < state.lineCount; i++) {
     span(mainLeft, `Lorem ipsum ${i}`, { width: "100%" });
   }
@@ -77,7 +77,7 @@ function App(body) {
     span(mainLeft, `Dolor amet ${state.lineCount + i}`, { width: "100%" });
   }
 
-  const mainRight = div(main, { flex: "y" });
+  const mainRight = div(main, { attributes: {flex: "y"} });
   if (button(mainRight, "Hello", { width: 64, height: 24 }).pressed) {
     state.lineCount += 1
     rerender();
@@ -165,4 +165,4 @@ function App(body) {
     }
   })
 }
-renderBody(App, { scrollY: true });
+renderBody(App, { attributes: {scrollY: true} });

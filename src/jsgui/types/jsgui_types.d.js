@@ -8,6 +8,9 @@
  * @property {number} _nextIndex
  */
 /**
+ * @typedef {Record<string, number | string | boolean | undefined | null> & {scrollX?: boolean; scrollY?: boolean; flex?: "x" | "x-reverse" | "y" | "y-reverse"; flexAlign?: "center" | "justify" | "start" | "scroll"}} HTMLAttributes
+*/
+/**
  * @typedef {Object} HTMLProps
  * @property {string} [key] - required if you want to dynamically add/remove components with state
  * @property {number | string} [margin]
@@ -17,15 +20,11 @@
  * @property {number | string} [minHeight]
  * @property {number | string} [height]
  * @property {number | string} [maxHeight]
- * @property {number | string} [autoSize]
+ * @property {number | string} [flex]
  * @property {number | string} [borderRadius]
  * @property {string} [border]
  * @property {string} [background]
  * @property {number | string} [padding]
- * @property {boolean} [scrollX]
- * @property {boolean} [scrollY]
- * @property {"x" | "x-reverse" | "y" | "y-reverse"} [flex]
- * @property {"center" | "justify" | "start" | "scroll"} [flexAlign]
  * @property {number | string} [columnGap]
  * @property {number | string} [rowGap]
  * @property {string} [fontFamily]
@@ -33,7 +32,7 @@
  * @property {number | string} [fontSize]
  * @property {string} [color]
  * @property {string} [className]
- * @property {Record<string, number | string | boolean | undefined | null>} [attributes]
+ * @property {HTMLAttributes} [attributes]
  * @property {Record<string, number | string | undefined | null>} [cssVars]
  */
 
