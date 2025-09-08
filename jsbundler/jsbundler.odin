@@ -1,5 +1,6 @@
 // odin run jsbundler
 // odin build jsbundler -o:speed
+// TODO: rewrite this with my own apis, so that it's not a 507 KB executable...
 package main
 import "core:fmt"
 import "core:os"
