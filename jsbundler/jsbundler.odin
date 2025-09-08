@@ -57,7 +57,6 @@ main :: proc() {
 		assert(err == nil)
 		match, index, ok := regex.match_iterator(&iterator)
 		for ok {
-			fmt.printfln("match: %v, %v, %v", match, index, ok)
 			j := match.pos[0][0]
 			if i < j {write(index_file, js_text[i:j])}
 
