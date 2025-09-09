@@ -9,6 +9,7 @@
 */
 package main
 import "core:fmt"
+import "core:os"
 import "core:strings"
 import "core:text/regex" // NOTE: this adds 19 KiB to the exe size
 import "path"
@@ -31,6 +32,8 @@ import "path"
 */
 
 main :: proc() {
+	//fmt.printfln("os.args: %v", os.args)
+
 	WalkData :: struct {
 		css_texts: [dynamic]string,
 		js_texts:  [dynamic]string,

@@ -25,7 +25,8 @@ walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr),
 	find := win.FindFirstFileW(wpath_to_search, &find_result)
 	if find != win.INVALID_HANDLE_VALUE {
 		for {
-			relative_path := _wstring_to_string(&find_result.cFileName[0])
+			relative_wpath := win.wstring(&find_result.cFileName[0])
+			relative_path := _wstring_to_string(relative_wpath)
 			if relative_path != "." && relative_path != ".." {
 				is_dir :=
 					(find_result.dwFileAttributes & win.FILE_ATTRIBUTE_DIRECTORY) ==
