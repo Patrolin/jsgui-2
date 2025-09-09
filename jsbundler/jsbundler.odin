@@ -14,6 +14,22 @@ import "core:text/regex" // NOTE: this adds 19 KiB to the exe size
 import "path"
 // NOTE: odin adds 250 KiB to exe size, just for RTTI - we need a better language?
 
+/* TODO: watch files with
+	for {
+		rebuild()
+		BOOL success = ReadDirectoryChangesW(
+				hDir,
+				buffer,
+				sizeof(buffer),
+				TRUE,   // 🔁 Watch subdirectories
+				FILE_NOTIFY_CHANGE_LAST_WRITE,  // ✅ Detect file content changes
+				&bytesReturned,
+				NULL,   // Blocking
+				NULL
+		);
+	}
+*/
+
 main :: proc() {
 	WalkData :: struct {
 		css_texts: [dynamic]string,

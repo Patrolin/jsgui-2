@@ -8,18 +8,18 @@ import win "core:sys/windows"
 FileHandle :: win.HANDLE
 
 // helper procs
-_wstring_to_string :: proc(wstr: win.wstring) -> string {
-	res, err := win.wstring_to_utf8_alloc(wstr, -1)
+_wstring_to_string :: proc(wstr: win.wstring, allocator := context.temp_allocator) -> string {
+	res, err := win.wstring_to_utf8_alloc(wstr, -1, allocator = allocator)
 	assert(err == nil)
 	return res
 }
-_string_to_wstring :: proc(str: string) -> win.wstring {
-	return win.utf8_to_wstring(str)
+_string_to_wstring :: proc(str: string, allocator := context.temp_allocator) -> win.wstring {
+	return win.utf8_to_wstring(str, allocator = allocator)
 }
 
 // procs
 walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr), data: rawptr) {
-	path_to_search := fmt.tprintf("%v\\*", dir_path)
+	path_to_search := fmt.tprint(dir_path, "*", sep = "\\")
 	wpath_to_search := _string_to_wstring(path_to_search)
 	find_result: win.WIN32_FIND_DATAW
 	find := win.FindFirstFileW(wpath_to_search, &find_result)
