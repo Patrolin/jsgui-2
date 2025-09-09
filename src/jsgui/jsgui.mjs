@@ -187,6 +187,16 @@ export function span(parent, text, props) {
 }
 /**
  * @param {Component} parent
+ * @param {HTMLProps} [props]
+ * @param {string} [text]
+ * @returns {Component} */
+export function link(parent, text, props) {
+  const info = getElement(parent, "a", props);
+  info.element.textContent = /** @type {any} */(text);
+  return info;
+}
+/**
+ * @param {Component} parent
  * @param {HTMLProps} props
  * @param {string} innerHTML
  * @returns {Component} */

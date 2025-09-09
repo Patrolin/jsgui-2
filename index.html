@@ -6,14 +6,18 @@
   --fontSize: 14px;
 }
 * {
+  /* sane defaults */
   box-sizing: border-box;
+  display: inline-block;
+  /* clear browser nonsense */
   min-width: 0;
   margin: 0;
   outline: none;
   border: none;
   background: none;
-  display: inline-block;
   overflow: hidden;
+  padding: 0;
+  /* sane defaults */
   color: inherit;
   line-height: unset;
   font-size: var(--font-size);
@@ -50,7 +54,7 @@ h4, h5, h6 {
   --font-size: 12px;
   font-weight: 400;
 }
-h1, h2, h3, h4, h5, h6, span {
+h1, h2, h3, h4, h5, h6, span, a {
   line-height: round(down, calc(var(--fontSize) * 1.4));
 }
 
@@ -429,6 +433,11 @@ function div(parent, props) {
 }
 function span(parent, text, props) {
   const info = getElement(parent, "span", props);
+  info.element.textContent = (text);
+  return info;
+}
+function link(parent, text, props) {
+  const info = getElement(parent, "a", props);
   info.element.textContent = (text);
   return info;
 }
