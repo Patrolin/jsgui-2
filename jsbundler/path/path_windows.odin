@@ -56,8 +56,11 @@ read_entire_file :: proc(file_path: string) -> (text: string, ok: bool) {
 	if ok {
 		sb := strings.builder_make_none()
 		buffer: [4096]u8
-		for win.ReadFile(file, &buffer, len(buffer), nil, nil) {
-			fmt.sbprint(&sb, buffer)
+		bytes_read: u32
+		for {
+			win.ReadFile(file, &buffer, len(buffer), &bytes_read, nil)
+			if bytes_read == 0 {break}
+			fmt.sbprint(&sb, transmute(string)(buffer[:bytes_read]))
 		}
 		win.CloseHandle(file)
 		text = strings.to_string(sb)

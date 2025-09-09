@@ -22,11 +22,13 @@ main :: proc() {
 	walk_data: WalkData
 	walk_proc :: proc(next_path: string, user_data: rawptr) {
 		walk_data := (^WalkData)(user_data)
-		if strings.ends_with(next_path, ".js") || strings.ends_with(next_path, ".mjs") {
+		extension_index := strings.last_index_byte(next_path, '.')
+		extension := next_path[extension_index:]
+		if extension == ".js" || extension == ".mjs" {
 			file_text, ok := path.read_entire_file(next_path)
 			fmt.assertf(ok, "Failed to read file '%v'", next_path)
 			append(&walk_data.js_texts, string(file_text))
-		} else if (strings.ends_with(next_path, ".css")) {
+		} else if extension == ".css" {
 			file_text, ok := path.read_entire_file(next_path)
 			fmt.assertf(ok, "Failed to read file '%v'", next_path)
 			append(&walk_data.css_texts, string(file_text))
