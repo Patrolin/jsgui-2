@@ -54,14 +54,10 @@ SocketAddressIpv4 :: struct {
 
 Socket :: win.SOCKET
 Server :: struct {
-	socket:       Socket,
-	address:      SocketAddress,
-	iocp:         win.HANDLE,
-	accept_async: win.LPFN_ACCEPTEX,
-}
-QueueMessageType :: enum u32 {
-	Generic,
-	Timeout,
+	socket:   Socket,
+	address:  SocketAddress,
+	iocp:     win.HANDLE,
+	AcceptEx: win.LPFN_ACCEPTEX,
 }
 AsyncClient :: struct {
 	// windows nonsense, NOTE: must be first field of struct
@@ -80,6 +76,7 @@ AsyncClient :: struct {
 AsyncClientState :: enum {
 	New,
 	Open,
+	SendingResponse,
 	ClosedByClient,
 	ClosedByTimeout,
 	ClosedByServer,
@@ -175,8 +172,8 @@ create_server_socket :: proc(server: ^Server, port: u16, thread_count := 1) {
 			win.SIO_GET_EXTENSION_FUNCTION_POINTER,
 			&accept_ex_guid,
 			size_of(accept_ex_guid),
-			&server.accept_async,
-			size_of(server.accept_async),
+			&server.AcceptEx,
+			size_of(server.AcceptEx),
 			&bytes_written,
 			nil,
 			nil,
@@ -202,7 +199,7 @@ _accept_client_async :: proc(server: ^Server) {
 	client.server = server
 	//client.overlapped = {} // NOTE: LPFN_ACCEPTEX requires this to be zerod
 	bytes_received: u32 = ---
-	ok := server.accept_async(
+	ok := server.AcceptEx(
 		server.socket,
 		client.socket,
 		&client.async_read_buffer[0],
@@ -243,10 +240,14 @@ _receive_client_data_async :: proc(client: ^AsyncClient) {
 		err,
 	)
 }
+send_response_and_close_client :: proc(client: ^AsyncClient, response: []byte) {
+	client.state = .SendingResponse
+	// TODO
+}
 cancel_timeout :: proc "std" (client: ^AsyncClient) {
 	DeleteTimerQueueTimer(nil, client.timeout_timer, nil)
 }
-close_client_and_cancel_io :: proc "std" (client: ^AsyncClient) {
+cancel_io_and_close_client :: proc "std" (client: ^AsyncClient) {
 	CancelIoEx(win.HANDLE(client.socket), nil)
 	close_client(client)
 }
@@ -262,13 +263,7 @@ close_client :: proc "std" (client: ^AsyncClient) {
 @(private)
 _on_timeout :: proc "std" (lpParam: rawptr, _TimerOrWaitFired: win.BOOLEAN) {
 	client := (^AsyncClient)(lpParam)
-	close_client_and_cancel_io(client) // NOTE: we must close the socket, so that timeout is the only event that triggers
-	win.PostQueuedCompletionStatus(
-		client.server.iocp,
-		0,
-		u32(QueueMessageType.Timeout),
-		&client.overlapped,
-	)
+	cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send a ERROR_OPERATION_ABORTED
 }
 /* usage:
 	for {
@@ -278,87 +273,82 @@ _on_timeout :: proc "std" (lpParam: rawptr, _TimerOrWaitFired: win.BOOLEAN) {
 	}
 */
 wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
-	for {
-		event_bytes: u32 = ---
-		key: uint
-		ok := win.GetQueuedCompletionStatus(
-			server.iocp,
-			&event_bytes,
-			&key,
-			(^^win.OVERLAPPED)(&client),
-			win.INFINITE,
-		)
-		err := win.GetLastError()
-		if !ok {
-			switch err {
-			case ERROR_CONNECTION_ABORTED:
-				client.state = .ClosedByClient
-				close_client(client)
-			case ERROR_OPERATION_ABORTED:
-				continue // ignore event
-			case:
-				fmt.assertf(false, "Failed to get next socket event, err: %v", err)
-			}
-		}
-		message_type := QueueMessageType(key) // NOTE: downcast, genious api design..
-		switch message_type {
-		case .Generic:
-		case .Timeout:
+	event_bytes: u32 = ---
+	key: uint
+	ok := win.GetQueuedCompletionStatus(
+		server.iocp,
+		&event_bytes,
+		&key,
+		(^^win.OVERLAPPED)(&client),
+		win.INFINITE,
+	)
+	err := win.GetLastError()
+	if !ok {
+		switch err {
+		case ERROR_CONNECTION_ABORTED:
+			client.state = .ClosedByClient
+			close_client(client)
+		case ERROR_OPERATION_ABORTED:
 			client.state = .ClosedByTimeout
+		case:
+			fmt.assertf(false, "Failed to get next socket event, err: %v", err)
 		}
-
-		switch client.state {
-		case .New:
-			// accept a new connection
-			fmt.assertf(
-				win.CreateIoCompletionPort(win.HANDLE(client.socket), server.iocp, 0, 0) ==
-				server.iocp,
-				"Failed to listen to the client socket with IOCP",
-			)
-			fmt.assertf(
-				win.setsockopt(
-					client.socket,
-					win.SOL_SOCKET,
-					win.SO_UPDATE_ACCEPT_CONTEXT,
-					rawptr(&server.socket),
-					size_of(Socket),
-				) ==
-				0,
-				"Failed to set client params",
-			)
-			fmt.assertf(
-				CreateTimerQueueTimer(
-					&client.timeout_timer,
-					nil,
-					_on_timeout,
-					client,
-					1000,
-					0,
-					WT_EXECUTEONLYONCE,
-				) ==
-				true,
-				"Failed to set a timeout",
-			)
-		// TODO: parse address via GetAcceptExSockaddrs()?
-		case .Open:
-			fmt.printfln("event_bytes: %v", event_bytes)
-			if event_bytes == 0 {
-				client.state = .ClosedByClient
-				close_client_and_cancel_io(client)
-			} else {
-				client.async_read_prev_pos = client.async_read_pos
-				client.async_read_pos += int(event_bytes)
-				_receive_client_data_async(client)
-				break
-			}
-			fallthrough
-		case .ClosedByTimeout, .ClosedByClient:
-		case .ClosedByServer:
-			assert(false, "Race condition!")
-		}
-		//fmt.printfln("%v, client: %p, state: %v", time.now(), client, client.state)
-		return
 	}
+
+	switch client.state {
+	case .New:
+		// accept a new connection
+		fmt.assertf(
+			win.CreateIoCompletionPort(win.HANDLE(client.socket), server.iocp, 0, 0) ==
+			server.iocp,
+			"Failed to listen to the client socket with IOCP",
+		)
+		fmt.assertf(
+			win.setsockopt(
+				client.socket,
+				win.SOL_SOCKET,
+				win.SO_UPDATE_ACCEPT_CONTEXT,
+				rawptr(&server.socket),
+				size_of(Socket),
+			) ==
+			0,
+			"Failed to set client params",
+		)
+		fmt.assertf(
+			CreateTimerQueueTimer(
+				&client.timeout_timer,
+				nil,
+				_on_timeout,
+				client,
+				1000,
+				0,
+				WT_EXECUTEONLYONCE,
+			) ==
+			true,
+			"Failed to set a timeout",
+		)
+	// TODO: parse address via GetAcceptExSockaddrs()?
+	case .Open:
+		fmt.printfln("event_bytes: %v", event_bytes)
+		if event_bytes == 0 {
+			// NOTE: presumably this means we're out of memory in the async_read_buffer?
+			client.state = .ClosedByClient
+			cancel_io_and_close_client(client)
+		} else {
+			client.async_read_prev_pos = client.async_read_pos
+			client.async_read_pos += int(event_bytes)
+			_receive_client_data_async(client)
+			break
+		}
+		fallthrough
+	case .SendingResponse:
+
+	case .ClosedByTimeout, .ClosedByClient:
+	case .ClosedByServer:
+		assert(false, "Race condition!")
+	}
+	//fmt.printfln("%v, client: %p, state: %v", time.now(), client, client.state)
+	return
 }
 handle_socket_event :: proc(server: ^Server, client: ^AsyncClient) {
 	switch client.state {
