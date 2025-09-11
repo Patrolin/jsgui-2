@@ -64,7 +64,7 @@ main :: proc() {
 	}
 }
 rebuild_index_file :: proc() {
-	fmt.print("\r- Rebuilding...")
+	//fmt.print("\r- Rebuilding...")
 	WalkData :: struct {
 		css_texts: [dynamic]string,
 		js_texts:  [dynamic]string,
@@ -116,5 +116,5 @@ rebuild_index_file :: proc() {
 		lib.write(index_file, js_text[i:])
 	}
 	lib.write(index_file, "</script>")
-	fmt.printf("\r- Bundled into index.html")
+	//fmt.printf("\r- Bundled into index.html")
 }
