@@ -1,4 +1,5 @@
 package lib
+import "base:intrinsics"
 import "core:fmt"
 import "core:strings"
 import win "core:sys/windows"
@@ -181,6 +182,7 @@ create_server_socket :: proc(server: ^Server, port: u16, thread_count := 1) {
 		0,
 		"Failed to setup async accept",
 	)
+	fmt.printfln("bytes_written: %v", bytes_written)
 	for i in 0 ..< thread_count {_accept_client_async(server)}
 	return
 }
@@ -240,9 +242,19 @@ _receive_client_data_async :: proc(client: ^AsyncClient) {
 		err,
 	)
 }
+@(private)
+_send_client_data_async :: proc(client: ^AsyncClient) {
+	// TODO: send the response with WSASend()
+}
 send_response_and_close_client :: proc(client: ^AsyncClient, response: []byte) {
-	client.state = .SendingResponse
-	// TODO
+	old, ok := intrinsics.atomic_compare_exchange_strong(&client.state, .Open, .SendingResponse)
+	fmt.assertf(
+		old != .SendingResponse,
+		"Cannot send_response_and_close_client() twice on the same client",
+	)
+	if ok {
+		// TODO: setup sending response
+	}
 }
 cancel_timeout :: proc "std" (client: ^AsyncClient) {
 	DeleteTimerQueueTimer(nil, client.timeout_timer, nil)
@@ -255,7 +267,7 @@ close_client :: proc "std" (client: ^AsyncClient) {
 	win.closesocket(client.socket)
 	cancel_timeout(client)
 	switch client.state {
-	case .New, .Open:
+	case .New, .Open, .SendingResponse:
 		client.state = .ClosedByServer
 	case .ClosedByClient, .ClosedByTimeout, .ClosedByServer:
 	}
@@ -263,7 +275,9 @@ close_client :: proc "std" (client: ^AsyncClient) {
 @(private)
 _on_timeout :: proc "std" (lpParam: rawptr, _TimerOrWaitFired: win.BOOLEAN) {
 	client := (^AsyncClient)(lpParam)
-	cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send a ERROR_OPERATION_ABORTED
+	if client.state == .Open {
+		cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send a ERROR_OPERATION_ABORTED
+	}
 }
 /* usage:
 	for {
@@ -329,7 +343,7 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 		)
 	// TODO: parse address via GetAcceptExSockaddrs()?
 	case .Open:
-		fmt.printfln("event_bytes: %v", event_bytes)
+		fmt.printfln("bytes_received: %v", event_bytes)
 		if event_bytes == 0 {
 			// NOTE: presumably this means we're out of memory in the async_read_buffer?
 			client.state = .ClosedByClient
@@ -337,13 +351,12 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 		} else {
 			client.async_read_prev_pos = client.async_read_pos
 			client.async_read_pos += int(event_bytes)
-			_receive_client_data_async(client)
 			break
 		}
 		fallthrough
 	case .SendingResponse:
-
-	case .ClosedByTimeout, .ClosedByClient:
+	// TODO
+	case .ClosedByClient, .ClosedByTimeout:
 	case .ClosedByServer:
 		assert(false, "Race condition!")
 	}
@@ -357,6 +370,9 @@ handle_socket_event :: proc(server: ^Server, client: ^AsyncClient) {
 		_receive_client_data_async(client)
 		_accept_client_async(server)
 	case .Open:
+		_receive_client_data_async(client)
+	case .SendingResponse:
+		_send_client_data_async(client)
 	case .ClosedByClient, .ClosedByTimeout, .ClosedByServer:
 		client.state = .ClosedByServer
 		free(client)
