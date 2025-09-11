@@ -199,7 +199,7 @@ _accept_client_async :: proc(server: ^Server) {
 	)
 	fmt.assertf(client.socket != INVALID_SOCKET, "Failed to create a client socket")
 	client.server = server
-	//client.overlapped = {} // NOTE: LPFN_ACCEPTEX requires this to be zerod
+	//client.overlapped = {} // NOTE: AcceptEx() requires this to be zerod
 	bytes_received: u32 = ---
 	ok := server.AcceptEx(
 		server.socket,
@@ -253,7 +253,7 @@ send_response_and_close_client :: proc(client: ^AsyncClient, response: []byte) {
 		"Cannot send_response_and_close_client() twice on the same client",
 	)
 	if ok {
-		// TODO: setup sending response
+		// TODO: setup sending response, or do we just get the OS to send the header + file via TransmitFile()?
 	}
 }
 cancel_timeout :: proc "std" (client: ^AsyncClient) {

@@ -19,15 +19,15 @@ serve_http_proc :: proc(data: rawptr) {
 		client := wait_for_next_socket_event(&server)
 		defer handle_socket_event(&server, client)
 
-		request := transmute(string)(client.async_read_buffer[:min(client.async_read_pos, 8)])
-
-		if client.async_read_pos < len(GET_START) {continue}
-		if !strings.starts_with(request, GET_START) {
-			cancel_io_and_close_client(client)
-		}
-		if strings.ends_with(request, HTTP_END) {
-			response := "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!"
-			send_response_and_close_client(client, transmute([]byte)(response))
+		if client.state == .Open {
+			request := transmute(string)(client.async_read_buffer[:client.async_read_pos])
+			if len(request) < len(GET_START) {continue}
+			if !strings.starts_with(request, GET_START) {
+				cancel_io_and_close_client(client)
+			} else if strings.ends_with(request, HTTP_END) {
+				response := "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!"
+				send_response_and_close_client(client, transmute([]byte)(response))
+			}
 		}
 	}
 }
