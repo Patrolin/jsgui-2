@@ -14,7 +14,7 @@ SRC_PATH :: "src"
 
 // globals
 serve_http := true
-serve_port := 3000
+serve_port: u16 = 3000
 
 print_help_and_exit :: proc() {
 	fmt.println("  jsbundler help    - print this")
@@ -46,14 +46,14 @@ main :: proc() {
 			if !ok || new_port > uint(max(u16)) {
 				print_help_and_exit()
 			}
-			serve_port = int(new_port)
+			serve_port = u16(new_port)
 		}
 	}
 
 	dir_for_watching: lib.WatchedDir
 	if serve_http {
 		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
-		//thread.create_and_start(lib.serve_http_proc, nil, nil)
+		thread.create_and_start_with_data(&serve_port, lib.serve_http_proc, nil, nil)
 		dir_for_watching = lib.open_dir_for_watching(SRC_PATH)
 	}
 	for {
