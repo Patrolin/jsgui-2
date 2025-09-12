@@ -71,7 +71,7 @@ function App(body) {
   const main = div(body, { width: "100%", padding: "8px 24px", attributes: {flex: "x", flexAlign: "start"}, columnGap: 16 });
   const mainLeft = div(main, { attributes: {flex: "y"} });
   for (let i = 0; i < state.lineCount; i++) {
-    span(mainLeft, `Lorem aipsum ${i}`, { width: "100%" });
+    span(mainLeft, `Lorem ipsum ${i}`, { width: "100%" });
   }
   for (let i = 0; i < state.lineCount; i++) {
     span(mainLeft, `Dolor amet ${state.lineCount + i}`, { width: "100%" });

@@ -2,6 +2,7 @@ package lib
 import win "core:sys/windows"
 
 // helper procs
+@(private)
 _wstring_to_string_cstring :: proc(
 	wstr: cstring16,
 	allocator := context.temp_allocator,
@@ -10,6 +11,7 @@ _wstring_to_string_cstring :: proc(
 	assert(err == nil)
 	return res
 }
+@(private)
 _wstring_to_string_slice :: proc(wstr: []u16, allocator := context.temp_allocator) -> string {
 	res, err := win.wstring_to_utf8_alloc(
 		win.wstring(raw_data(wstr)),

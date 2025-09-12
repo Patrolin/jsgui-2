@@ -82,7 +82,7 @@ AsyncClient :: struct {
 	async_rw_prev_pos:     int,
 	async_rw_pos:          int,
 	async_rw_slice:        win.WSABUF `fmt:"-"`,
-	async_rw_buffer:       [4096]byte `fmt:"-"`, // TODO: set a better buffer size?
+	async_rw_buffer:       [2048]byte `fmt:"-"`, // TODO: set a better buffer size?
 	async_write_file_path: win.wstring,
 	async_write_file:      FileHandle,
 	async_write_slice:     TRANSMIT_FILE_BUFFERS,
