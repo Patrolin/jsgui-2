@@ -12,7 +12,7 @@ WatchedDir :: struct {
 	path:         string,
 	handle:       DirHandle,
 	overlapped:   win.OVERLAPPED,
-	async_buffer: [2048]byte,
+	async_buffer: [2048]byte `fmt:"-"`,
 }
 FileHandle :: distinct win.HANDLE
 
@@ -96,12 +96,14 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 		}
 	}
 	// wait for changes
+	fmt.printfln("dir: %v", dir)
 	fmt.assertf(
 		win.WaitForSingleObject(dir.overlapped.hEvent, win.INFINITE) == win.WAIT_OBJECT_0,
 		"Failed to wait for file changes",
 	)
 	wait_for_writes_to_finish(dir)
 	// while have_changes() {pop_change()}
+	/* TODO: wtf
 	for i in 0 ..< 3 {
 		win.ResetEvent(dir.overlapped.hEvent)
 		fmt.printfln("i: %v", i)
@@ -124,6 +126,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 		if !ok {break}
 		wait_for_writes_to_finish(dir)
 	}
+	*/
 }
 
 // file procs
