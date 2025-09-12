@@ -1,6 +1,7 @@
 package lib
 import "base:intrinsics"
 import "core:fmt"
+import "core:mem"
 import "core:strings"
 import win "core:sys/windows"
 import "core:time"
@@ -10,6 +11,10 @@ WINSOCK_MAJOR_VERSION :: 2
 WINSOCK_MINOR_VERSION :: 2
 
 // constants
+WT_EXECUTEONLYONCE :: 0x8
+TF_DISCONNECT :: 0x1
+TF_REUSE_SOCKET :: 0x2
+
 WSADESCRIPTION_LEN :: 256
 WSASYS_STATUS_LEN :: 128
 SOMAXCONN :: max(i32)
@@ -27,10 +32,15 @@ CONNECTION_TYPE_DGRAM :: 2
 PROTOCOL_TCP :: 6
 PROTOCOL_UDP :: 17
 
-WT_EXECUTEONLYONCE :: 0x8
 
 // types
 WAITORTIMERCALLBACK :: proc "std" (lpParam: win.PVOID, TimerOrWaitFired: win.BOOLEAN)
+TRANSMIT_FILE_BUFFERS :: struct {
+	head:        rawptr,
+	head_length: u32,
+	tail:        rawptr,
+	tail_length: u32,
+}
 
 WinsockData :: struct {
 	wVersion:       u16,
@@ -62,22 +72,26 @@ Server :: struct {
 }
 AsyncClient :: struct {
 	// windows nonsense, NOTE: must be first field of struct
-	overlapped:          win.OVERLAPPED `fmt:"-"`,
-	address:             SocketAddress,
-	socket:              Socket,
-	timeout_timer:       win.HANDLE,
-	state:               AsyncClientState,
-	server:              ^Server,
+	overlapped:            win.OVERLAPPED `fmt:"-"`,
+	address:               SocketAddress,
+	socket:                Socket,
+	timeout_timer:         win.HANDLE,
+	state:                 AsyncClientState,
+	server:                ^Server,
 	// nil if we just accepted the connection
-	async_read_prev_pos: int,
-	async_read_pos:      int,
-	async_read_slice:    win.WSABUF `fmt:"-"`,
-	async_read_buffer:   [4096]byte `fmt:"-"`, // TODO: set a better buffer size?
+	async_rw_prev_pos:     int,
+	async_rw_pos:          int,
+	async_rw_slice:        win.WSABUF `fmt:"-"`,
+	async_rw_buffer:       [4096]byte `fmt:"-"`, // TODO: set a better buffer size?
+	async_write_file_path: win.wstring,
+	async_write_file:      FileHandle,
+	async_write_slice:     TRANSMIT_FILE_BUFFERS,
 }
 AsyncClientState :: enum {
 	New,
 	Open,
-	SendingResponse,
+	SendingResponseAndClosing,
+	ClosedByServerResponse,
 	ClosedByClient,
 	ClosedByTimeout,
 	ClosedByServer,
@@ -91,13 +105,16 @@ _winsock: WinsockData
 foreign import kernel32 "system:Kernel32.lib"
 @(default_calling_convention = "c")
 foreign winsock_lib {
+	@(private)
 	CreateTimerQueueTimer :: proc(timer: ^win.HANDLE, timer_queue: win.HANDLE, callback: WAITORTIMERCALLBACK, parameter: win.PVOID, timeout_ms, period_ms: i32, flags: u32) -> win.BOOL ---
+	@(private)
 	DeleteTimerQueueTimer :: proc(timer_queue: win.HANDLE, timer: win.HANDLE, event: win.HANDLE) ---
-	CancelIoEx :: proc(handle: win.HANDLE, lpOverlapped: win.LPOVERLAPPED) -> win.BOOL ---
+	@(private)
+	CancelIoEx :: proc(handle: win.HANDLE, overlapped: win.LPOVERLAPPED) -> win.BOOL ---
 }
 
 // socket imports
-// TODO: wtf calling conventions
+// NOTE: WSAAPI is ignore on 64-bit windows
 foreign import winsock_lib "system:Ws2_32.lib"
 @(default_calling_convention = "c")
 foreign winsock_lib {
@@ -105,23 +122,22 @@ foreign winsock_lib {
 	WSAStartup :: proc(requested_version: u16, winsock: ^WinsockData) -> i32 ---
 	@(private)
 	WSAIoctl :: proc(s: Socket, dwIoControlCode: u32, lpvInBuffer: rawptr, cbInBuffer: u32, lpvOutBuffer: rawptr, cbOutBuffer: u32, lpcbBytesReturned: ^u32, lpOverlapped: ^win.OVERLAPPED, lpCompletionRoutine: win.LPWSAOVERLAPPED_COMPLETION_ROUTINE) -> i32 ---
-}
-@(default_calling_convention = "std")
-foreign winsock_lib {
+
 	@(private, link_name = "socket")
 	winsock_socket :: proc(address_type, connection_type, protocol: i32) -> Socket ---
 	@(private, link_name = "bind")
 	winsock_bind :: proc(socket: Socket, address: ^SocketAddress, address_size: i32) -> i32 ---
 	@(private, link_name = "listen")
 	winsock_listen :: proc(socket: Socket, n: i32) -> i32 ---
-	@(private, link_name = "accept")
-	winsock_accept :: proc(socket: Socket, address: ^SocketAddress, address_size: ^i32) -> Socket ---
 	@(private, link_name = "closesocket")
 	winsock_closesocket :: proc(socket: Socket) -> i32 ---
-	@(private, link_name = "recv")
-	winsock_recv :: proc(socket: Socket, buffer: [^]byte, buffer_size, flags: i32) -> i32 ---
-	@(private, link_name = "send")
-	winsock_send :: proc(socket: Socket, buffer: [^]byte, buffer_size, flags: i32) -> i32 ---
+}
+
+foreign import winsock_ext_lib "system:Mswsock.lib"
+@(default_calling_convention = "c")
+foreign winsock_ext_lib {
+	@(private)
+	TransmitFile :: proc(socket: Socket, file: FileHandle, bytes_to_write, bytes_per_send: u32, overlapped: win.LPOVERLAPPED, transmit_buffers: ^TRANSMIT_FILE_BUFFERS, flags: u32) -> win.BOOL ---
 }
 
 // socket procs
@@ -182,7 +198,7 @@ create_server_socket :: proc(server: ^Server, port: u16, thread_count := 1) {
 		0,
 		"Failed to setup async accept",
 	)
-	fmt.printfln("bytes_written: %v", bytes_written)
+	//fmt.printfln("bytes_written: %v", bytes_written)
 	for i in 0 ..< thread_count {_accept_client_async(server)}
 	return
 }
@@ -199,12 +215,12 @@ _accept_client_async :: proc(server: ^Server) {
 	)
 	fmt.assertf(client.socket != INVALID_SOCKET, "Failed to create a client socket")
 	client.server = server
-	//client.overlapped = {} // NOTE: AcceptEx() requires this to be zerod
 	bytes_received: u32 = ---
+	//client.overlapped = {} // NOTE: AcceptEx() requires this to be zerod
 	ok := server.AcceptEx(
 		server.socket,
 		client.socket,
-		&client.async_read_buffer[0],
+		&client.async_rw_buffer[0],
 		0,
 		size_of(SocketAddressIpv4) + 16,
 		size_of(SocketAddressIpv4) + 16,
@@ -220,15 +236,16 @@ _accept_client_async :: proc(server: ^Server) {
 }
 @(private)
 _receive_client_data_async :: proc(client: ^AsyncClient) {
-	client.overlapped = {} // NOTE: WSARecv() requires this to be zerod
-	client.async_read_slice = {
-		buf = &client.async_read_buffer[client.async_read_pos],
-		len = u32(len(client.async_read_buffer) - client.async_read_pos),
+	client.async_rw_slice = {
+		buf = &client.async_rw_buffer[client.async_rw_pos],
+		len = u32(len(client.async_rw_buffer) - client.async_rw_pos),
 	}
 	flags: u32 = 0
+
+	client.overlapped = {}
 	has_error := win.WSARecv(
 		client.socket,
-		&client.async_read_slice,
+		&client.async_rw_slice,
 		1,
 		nil,
 		&flags,
@@ -244,17 +261,75 @@ _receive_client_data_async :: proc(client: ^AsyncClient) {
 }
 @(private)
 _send_client_data_async :: proc(client: ^AsyncClient) {
-	// TODO: send the response with WSASend()
+	// TODO: send the response with WSASend(), but then we can't receive data (unless you allocate more overlappeds?)
 }
-send_response_and_close_client :: proc(client: ^AsyncClient, response: []byte) {
-	old, ok := intrinsics.atomic_compare_exchange_strong(&client.state, .Open, .SendingResponse)
-	fmt.assertf(
-		old != .SendingResponse,
-		"Cannot send_response_and_close_client() twice on the same client",
+open_file_for_response :: proc(
+	client: ^AsyncClient,
+	file_path: string,
+) -> (
+	file: FileHandle,
+	file_size: int,
+	ok: bool,
+) {
+	client.async_write_file_path = _string_to_wstring(file_path, allocator = context.allocator)
+	file = FileHandle(
+		win.CreateFileW(
+			client.async_write_file_path,
+			win.GENERIC_READ,
+			win.FILE_SHARE_READ | win.FILE_SHARE_WRITE,
+			nil,
+			win.OPEN_EXISTING,
+			win.FILE_ATTRIBUTE_NORMAL | win.FILE_FLAG_SEQUENTIAL_SCAN,
+			nil,
+		),
 	)
-	if ok {
-		// TODO: setup sending response, or do we just get the OS to send the header + file via TransmitFile()?
+	client.async_write_file = file
+	win_file_size: win.LARGE_INTEGER = ---
+	fmt.assertf(
+		win.GetFileSizeEx(win.HANDLE(file), &win_file_size) == true,
+		"Failed to get file size",
+	)
+	file_size = int(win_file_size)
+	ok = file != FileHandle(win.INVALID_HANDLE_VALUE)
+	return
+}
+send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte) {
+	// NOTE: don't overwrite if state == .ClosedXX
+	old, _ := intrinsics.atomic_compare_exchange_strong(
+		&client.state,
+		.Open,
+		.SendingResponseAndClosing,
+	)
+	if old == .ClosedByTimeout {return}
+	fmt.assertf(old == .Open, "Cannot send_response_and_close_client() twice on the same client")
+
+	fmt.assertf(
+		len(header) < len(client.async_rw_buffer),
+		"len(header) must be < len(client.async_rw_buffer), got: %v",
+		len(header),
+	)
+	mem.copy(&client.async_rw_buffer, raw_data(header), len(header))
+
+	client.async_rw_prev_pos = 0
+	client.async_rw_pos = 0
+	client.async_rw_slice = {}
+	client.async_write_slice = {
+		head        = &client.async_rw_buffer,
+		head_length = u32(len(header)),
 	}
+
+	client.overlapped = {}
+	ok := TransmitFile(
+		client.socket,
+		client.async_write_file,
+		0,
+		0,
+		&client.overlapped,
+		&client.async_write_slice,
+		TF_DISCONNECT | TF_REUSE_SOCKET,
+	)
+	err := win.WSAGetLastError()
+	fmt.assertf(ok == true || err == win.WSA_IO_PENDING, "Failed to send response, err: %v", err)
 }
 cancel_timeout :: proc "std" (client: ^AsyncClient) {
 	DeleteTimerQueueTimer(nil, client.timeout_timer, nil)
@@ -264,12 +339,12 @@ cancel_io_and_close_client :: proc "std" (client: ^AsyncClient) {
 	close_client(client)
 }
 close_client :: proc "std" (client: ^AsyncClient) {
-	win.closesocket(client.socket)
+	winsock_closesocket(client.socket)
 	cancel_timeout(client)
 	switch client.state {
-	case .New, .Open, .SendingResponse:
+	case .New, .Open, .SendingResponseAndClosing:
 		client.state = .ClosedByServer
-	case .ClosedByClient, .ClosedByTimeout, .ClosedByServer:
+	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
 	}
 }
 @(private)
@@ -308,6 +383,7 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 			fmt.assertf(false, "Failed to get next socket event, err: %v", err)
 		}
 	}
+	//fmt.printfln("state.1: %v, client: %v", client.state, client.socket)
 
 	switch client.state {
 	case .New:
@@ -343,27 +419,29 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 		)
 	// TODO: parse address via GetAcceptExSockaddrs()?
 	case .Open:
-		fmt.printfln("bytes_received: %v", event_bytes)
+		//fmt.printfln("bytes_received: %v", event_bytes)
 		if event_bytes == 0 {
 			// NOTE: presumably this means we're out of memory in the async_read_buffer?
 			client.state = .ClosedByClient
 			cancel_io_and_close_client(client)
 		} else {
-			client.async_read_prev_pos = client.async_read_pos
-			client.async_read_pos += int(event_bytes)
+			client.async_rw_prev_pos = client.async_rw_pos
+			client.async_rw_pos += int(event_bytes)
 			break
 		}
 		fallthrough
-	case .SendingResponse:
-	// TODO
-	case .ClosedByClient, .ClosedByTimeout:
+	case .SendingResponseAndClosing:
+		client.state = .ClosedByServerResponse
+		close_client(client)
+	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse:
 	case .ClosedByServer:
 		assert(false, "Race condition!")
 	}
-	//fmt.printfln("%v, client: %p, state: %v", time.now(), client, client.state)
+	//fmt.printfln("state.2: %v", client.state)
 	return
 }
 handle_socket_event :: proc(server: ^Server, client: ^AsyncClient) {
+	//fmt.printfln("state.3: %v", client.state)
 	switch client.state {
 	case .New:
 		client.state = .Open
@@ -371,10 +449,14 @@ handle_socket_event :: proc(server: ^Server, client: ^AsyncClient) {
 		_accept_client_async(server)
 	case .Open:
 		_receive_client_data_async(client)
-	case .SendingResponse:
-		_send_client_data_async(client)
-	case .ClosedByClient, .ClosedByTimeout, .ClosedByServer:
+	case .SendingResponseAndClosing:
+	// NOTE: handled by OS via TransmitFile()
+	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
 		client.state = .ClosedByServer
+		if client.async_write_file != nil {
+			win.CloseHandle(win.HANDLE(client.async_write_file))
+			free(rawptr(client.async_write_file_path))
+		}
 		free(client)
 	}
 }

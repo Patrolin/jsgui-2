@@ -20,13 +20,23 @@ serve_http_proc :: proc(data: rawptr) {
 		defer handle_socket_event(&server, client)
 
 		if client.state == .Open {
-			request := transmute(string)(client.async_read_buffer[:client.async_read_pos])
+			request := transmute(string)(client.async_rw_buffer[:client.async_rw_pos])
 			if len(request) < len(GET_START) {continue}
 			if !strings.starts_with(request, GET_START) {
 				cancel_io_and_close_client(client)
 			} else if strings.ends_with(request, HTTP_END) {
-				response := "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!"
-				send_response_and_close_client(client, transmute([]byte)(response))
+				// TODO: handle favicons or whatever?
+				file_path := "index.html"
+				file, file_size, ok := open_file_for_response(client, file_path)
+				fmt.assertf(ok, "Failed to open file: '%v'", file_path)
+				// write http headers
+				content_type := "text/html"
+				header := fmt.tprintf(
+					"HTTP/1.1 200 OK\r\nContent-Length: %v\r\nContent-Type: %v\r\nConnection: close\r\n\r\n",
+					file_size,
+					content_type,
+				)
+				send_file_response_and_close_client(client, transmute([]byte)(header))
 			}
 		}
 	}

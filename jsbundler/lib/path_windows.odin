@@ -89,7 +89,7 @@ read_entire_file :: proc(file_path: string) -> (text: string, ok: bool) {
 	file := win.CreateFileW(
 		_string_to_wstring(file_path),
 		win.GENERIC_READ,
-		0,
+		win.FILE_SHARE_READ,
 		nil,
 		win.OPEN_EXISTING,
 		0,
@@ -115,7 +115,7 @@ open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHand
 		win.CreateFileW(
 			_string_to_wstring(file_path),
 			win.GENERIC_WRITE,
-			0,
+			win.FILE_SHARE_READ,
 			nil,
 			win.TRUNCATE_EXISTING,
 			win.FILE_ATTRIBUTE_NORMAL,
