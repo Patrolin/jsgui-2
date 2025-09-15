@@ -351,7 +351,7 @@ close_client :: proc "std" (client: ^AsyncClient) {
 _on_timeout :: proc "std" (lpParam: rawptr, _TimerOrWaitFired: win.BOOLEAN) {
 	client := (^AsyncClient)(lpParam)
 	if client.state == .Reading {
-		cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send a ERROR_OPERATION_ABORTED
+		cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send an ERROR_OPERATION_ABORTED
 	}
 }
 /* usage:
