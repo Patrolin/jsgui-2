@@ -6,6 +6,10 @@ import "core:strings"
 import win "core:sys/windows"
 import "core:time"
 
+// constants
+ERROR_IO_INCOMPLETE :: 996
+ERROR_IO_PENDING :: 997
+
 // types
 DirHandle :: distinct win.HANDLE
 WatchedDir :: struct {
@@ -51,15 +55,7 @@ open_dir_for_watching :: proc(dir_path: string) -> (dir: WatchedDir) {
 }
 wait_for_file_changes :: proc(dir: ^WatchedDir) {
 	wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
-		bytes_written: u32 = ---
-		ok := win.GetOverlappedResult(
-			win.HANDLE(dir.handle),
-			&dir.overlapped,
-			&bytes_written,
-			false,
-		)
-		fmt.assertf(ok == true, "Failed to wait for file changes, err: %v", win.GetLastError())
-		// NOTE: windows will only give us notifications for the start of each write for each file, not the end of all writes for each file
+		/* NOTE: windows will give us the start of each write, not the end... */
 		offset: u32 = 0
 		for {
 			// chess battle advanced
@@ -67,7 +63,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			wrelative_file_path_buffer := ([^]u16)(&item.file_name)[:item.file_name_length]
 			relative_file_path := _wstring_to_string(wrelative_file_path_buffer)
 			file_path := fmt.tprint(dir.path, relative_file_path, sep = "/")
-			fmt.printfln("item: %v, file_path: %v", item, file_path)
+			//fmt.printfln("item: %v, file_path: %v", item, file_path)
 			wcfile_path := _string_to_wstring(file_path)
 
 			// wait for file_size to change..
@@ -95,38 +91,60 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			if offset == 0 {break}
 		}
 	}
-	// wait for changes
-	fmt.printfln("dir: %v", dir)
-	fmt.assertf(
-		win.WaitForSingleObject(dir.overlapped.hEvent, win.INFINITE) == win.WAIT_OBJECT_0,
-		"Failed to wait for file changes",
-	)
-	wait_for_writes_to_finish(dir)
-	// while have_changes() {pop_change()}
-	/* TODO: wtf
-	for i in 0 ..< 3 {
-		win.ResetEvent(dir.overlapped.hEvent)
-		fmt.printfln("i: %v", i)
-		time.sleep(time.Millisecond)
 
-		ok := win.ReadDirectoryChangesW(
-			win.HANDLE(dir.handle),
-			&dir.async_buffer,
-			len(dir.async_buffer),
-			true, // NOTE: watch subdirectories
-			win.FILE_NOTIFY_CHANGE_LAST_WRITE,
-			nil,
-			&dir.overlapped,
-			nil,
-		)
-		fmt.assertf(ok == true, "Failed to watch directory for changes")
-		state := win.WaitForSingleObject(dir.overlapped.hEvent, 0)
-		ok = state == win.WAIT_OBJECT_0
-		fmt.printfln("i: %v, ok: %v, state: %v", i, ok, state)
-		if !ok {break}
-		wait_for_writes_to_finish(dir)
+	// wait for changes
+	bytes_written: u32 = ---
+	wait := true
+	for {
+		/* NOTE: windows will give us multiple notifications per file (truncate (or literally nothing) + the start of each write) */
+		//fmt.printfln("watching dir: '%v', wait: %v", dir.path, wait)
+		wait_result := win.WaitForSingleObject(dir.overlapped.hEvent, wait ? win.INFINITE : 1)
+		switch wait_result {
+		case win.WAIT_OBJECT_0:
+			{
+				ok := win.GetOverlappedResult(
+					win.HANDLE(dir.handle),
+					&dir.overlapped,
+					&bytes_written,
+					true,
+				)
+				if ok {
+					/* NOTE: windows in its infinite wisdom can signal us with 0 bytes written, with no way to know what actually changed... */
+					//fmt.printfln("ok: %v, bytes_written: %v", ok, bytes_written)
+					if bytes_written > 0 {wait_for_writes_to_finish(dir)}
+					// NOTE: only reset the event after windows has finished writing the changes
+					fmt.assertf(
+						win.ResetEvent(dir.overlapped.hEvent) == true,
+						"Failed to reset event",
+					)
+					ok = win.ReadDirectoryChangesW(
+						win.HANDLE(dir.handle),
+						&dir.async_buffer,
+						len(dir.async_buffer),
+						true, // NOTE: watch subdirectories
+						win.FILE_NOTIFY_CHANGE_LAST_WRITE,
+						nil,
+						&dir.overlapped,
+						nil,
+					)
+					fmt.assertf(ok == true, "Failed to watch directory for changes")
+					wait = false
+				} else {
+					err := win.GetLastError()
+					//fmt.printfln("ok: %v, err: %v, bytes_written: %v", ok, err, bytes_written)
+					fmt.assertf(
+						err == ERROR_IO_INCOMPLETE || err == ERROR_IO_PENDING,
+						"Failed to call GetOverlappedResult(), err: %v",
+						err,
+					)
+				}
+			}
+		case win.WAIT_TIMEOUT:
+			return
+		case:
+			fmt.assertf(false, "Failed to wait for file changes")
+		}
 	}
-	*/
 }
 
 // file procs

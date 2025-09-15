@@ -64,7 +64,7 @@ main :: proc() {
 	}
 }
 rebuild_index_file :: proc() {
-	//fmt.print("\r- Rebuilding...")
+	fmt.print("\r- Rebuilding...")
 	WalkData :: struct {
 		css_texts: [dynamic]string,
 		js_texts:  [dynamic]string,
@@ -76,7 +76,6 @@ rebuild_index_file :: proc() {
 		extension := next_path[extension_index:]
 		if extension == ".js" || extension == ".mjs" {
 			file_text, ok := lib.read_entire_file(next_path)
-			fmt.printfln("next_path: %v (%v)", next_path, len(file_text))
 			fmt.assertf(ok, "Failed to read file '%v'", next_path)
 			append(&walk_data.js_texts, string(file_text))
 		} else if extension == ".css" {
@@ -118,5 +117,5 @@ rebuild_index_file :: proc() {
 	}
 	lib.write(index_file, "</script>")
 	lib.close_file(index_file)
-	//fmt.printf("\r- Bundled into index.html")
+	fmt.printf("\r- Bundled into index.html")
 }
