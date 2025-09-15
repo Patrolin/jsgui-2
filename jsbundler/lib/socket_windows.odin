@@ -82,14 +82,14 @@ AsyncClient :: struct {
 	async_rw_prev_pos:     int,
 	async_rw_pos:          int,
 	async_rw_slice:        win.WSABUF `fmt:"-"`,
-	async_rw_buffer:       [2048]byte `fmt:"-"`, // TODO: set a better buffer size?
+	async_rw_buffer:       [2048]byte `fmt:"-"`,
 	async_write_file_path: win.wstring,
 	async_write_file:      FileHandle,
 	async_write_slice:     TRANSMIT_FILE_BUFFERS,
 }
 AsyncClientState :: enum {
 	New,
-	Open,
+	Reading,
 	SendingResponseAndClosing,
 	ClosedByServerResponse,
 	ClosedByClient,
@@ -297,11 +297,14 @@ send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte
 	// NOTE: don't overwrite if state == .ClosedXX
 	old, _ := intrinsics.atomic_compare_exchange_strong(
 		&client.state,
-		.Open,
+		.Reading,
 		.SendingResponseAndClosing,
 	)
 	if old == .ClosedByTimeout {return}
-	fmt.assertf(old == .Open, "Cannot send_response_and_close_client() twice on the same client")
+	fmt.assertf(
+		old == .Reading,
+		"Cannot send_response_and_close_client() twice on the same client",
+	)
 
 	fmt.assertf(
 		len(header) < len(client.async_rw_buffer),
@@ -342,7 +345,7 @@ close_client :: proc "std" (client: ^AsyncClient) {
 	winsock_closesocket(client.socket)
 	cancel_timeout(client)
 	switch client.state {
-	case .New, .Open, .SendingResponseAndClosing:
+	case .New, .Reading, .SendingResponseAndClosing:
 		client.state = .ClosedByServer
 	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
 	}
@@ -350,7 +353,7 @@ close_client :: proc "std" (client: ^AsyncClient) {
 @(private)
 _on_timeout :: proc "std" (lpParam: rawptr, _TimerOrWaitFired: win.BOOLEAN) {
 	client := (^AsyncClient)(lpParam)
-	if client.state == .Open {
+	if client.state == .Reading {
 		cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send a ERROR_OPERATION_ABORTED
 	}
 }
@@ -418,7 +421,7 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 			"Failed to set a timeout",
 		)
 	// TODO: parse address via GetAcceptExSockaddrs()?
-	case .Open:
+	case .Reading:
 		//fmt.printfln("bytes_received: %v", event_bytes)
 		if event_bytes == 0 {
 			// NOTE: presumably this means we're out of memory in the async_read_buffer?
@@ -441,13 +444,14 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 	return
 }
 handle_socket_event :: proc(server: ^Server, client: ^AsyncClient) {
+	// TODO: move this to user code?
 	//fmt.printfln("state.3: %v", client.state)
 	switch client.state {
 	case .New:
-		client.state = .Open
+		client.state = .Reading
 		_receive_client_data_async(client)
 		_accept_client_async(server)
-	case .Open:
+	case .Reading:
 		_receive_client_data_async(client)
 	case .SendingResponseAndClosing:
 	// NOTE: handled by OS via TransmitFile()

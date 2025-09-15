@@ -19,7 +19,7 @@ serve_http_proc :: proc(data: rawptr) {
 		client := wait_for_next_socket_event(&server)
 		defer handle_socket_event(&server, client)
 
-		if client.state == .Open {
+		if client.state == .Reading {
 			request := transmute(string)(client.async_rw_buffer[:client.async_rw_pos])
 			if len(request) < len(GET_START) {continue}
 			if !strings.starts_with(request, GET_START) {
