@@ -73,12 +73,10 @@ Server :: struct {
 AsyncClient :: struct {
 	// windows nonsense, NOTE: must be first field of struct
 	overlapped:            win.OVERLAPPED `fmt:"-"`,
-	address:               SocketAddress,
 	socket:                Socket,
-	timeout_timer:         win.HANDLE,
+	address:               SocketAddress,
 	state:                 AsyncClientState,
-	server:                ^Server,
-	// nil if we just accepted the connection
+	timeout_timer:         win.HANDLE,
 	async_write_file_path: win.wstring,
 	async_write_file:      FileHandle,
 	async_write_slice:     TRANSMIT_FILE_BUFFERS `fmt:"-"`,
@@ -214,7 +212,6 @@ _accept_client_async :: proc(server: ^Server) {
 		win.WSA_FLAG_OVERLAPPED,
 	)
 	fmt.assertf(client.socket != INVALID_SOCKET, "Failed to create a client socket")
-	client.server = server
 	bytes_received: u32 = ---
 	//client.overlapped = {} // NOTE: AcceptEx() requires this to be zerod
 	ok := server.AcceptEx(
