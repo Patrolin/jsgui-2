@@ -79,13 +79,13 @@ AsyncClient :: struct {
 	state:                 AsyncClientState,
 	server:                ^Server,
 	// nil if we just accepted the connection
+	async_write_file_path: win.wstring,
+	async_write_file:      FileHandle,
+	async_write_slice:     TRANSMIT_FILE_BUFFERS `fmt:"-"`,
 	async_rw_prev_pos:     int,
 	async_rw_pos:          int,
 	async_rw_slice:        win.WSABUF `fmt:"-"`,
 	async_rw_buffer:       [2048]byte `fmt:"-"`,
-	async_write_file_path: win.wstring,
-	async_write_file:      FileHandle,
-	async_write_slice:     TRANSMIT_FILE_BUFFERS,
 }
 AsyncClientState :: enum {
 	New,
