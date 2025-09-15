@@ -83,7 +83,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			file_size: win.LARGE_INTEGER = 0
 			for file_size != prev_file_size {
 				prev_file_size = file_size
-				time.sleep(10)
+				time.sleep(time.Microsecond)
 				win.GetFileSizeEx(file, &file_size)
 			}
 			// get the next item
@@ -99,50 +99,44 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 		/* NOTE: windows will give us multiple notifications per file (truncate (or literally nothing) + the start of each write) */
 		//fmt.printfln("watching dir: '%v', wait: %v", dir.path, wait)
 		wait_result := win.WaitForSingleObject(dir.overlapped.hEvent, wait ? win.INFINITE : 1)
-		switch wait_result {
-		case win.WAIT_OBJECT_0:
-			{
-				ok := win.GetOverlappedResult(
-					win.HANDLE(dir.handle),
-					&dir.overlapped,
-					&bytes_written,
-					true,
-				)
-				if ok {
-					/* NOTE: windows in its infinite wisdom can signal us with 0 bytes written, with no way to know what actually changed... */
-					//fmt.printfln("ok: %v, bytes_written: %v", ok, bytes_written)
-					if bytes_written > 0 {wait_for_writes_to_finish(dir)}
-					// NOTE: only reset the event after windows has finished writing the changes
-					fmt.assertf(
-						win.ResetEvent(dir.overlapped.hEvent) == true,
-						"Failed to reset event",
-					)
-					ok = win.ReadDirectoryChangesW(
-						win.HANDLE(dir.handle),
-						&dir.async_buffer,
-						len(dir.async_buffer),
-						true, // NOTE: watch subdirectories
-						win.FILE_NOTIFY_CHANGE_LAST_WRITE,
-						nil,
-						&dir.overlapped,
-						nil,
-					)
-					fmt.assertf(ok == true, "Failed to watch directory for changes")
-					wait = false
-				} else {
-					err := win.GetLastError()
-					//fmt.printfln("ok: %v, err: %v, bytes_written: %v", ok, err, bytes_written)
-					fmt.assertf(
-						err == ERROR_IO_INCOMPLETE || err == ERROR_IO_PENDING,
-						"Failed to call GetOverlappedResult(), err: %v",
-						err,
-					)
-				}
-			}
-		case win.WAIT_TIMEOUT:
-			return
-		case:
-			fmt.assertf(false, "Failed to wait for file changes")
+		if wait_result == win.WAIT_TIMEOUT {break}
+		fmt.assertf(
+			wait_result == win.WAIT_OBJECT_0,
+			"Failed to wait for file changes, wait_result: %v",
+			wait_result,
+		)
+		ok := win.GetOverlappedResult(
+			win.HANDLE(dir.handle),
+			&dir.overlapped,
+			&bytes_written,
+			true,
+		)
+		if ok {
+			/* NOTE: windows in its infinite wisdom can signal us with 0 bytes written, with no way to know what actually changed... */
+			//fmt.printfln("ok: %v, bytes_written: %v", ok, bytes_written)
+			if bytes_written > 0 {wait_for_writes_to_finish(dir)}
+			// NOTE: only reset the event after windows has finished writing the changes
+			fmt.assertf(win.ResetEvent(dir.overlapped.hEvent) == true, "Failed to reset event")
+			ok = win.ReadDirectoryChangesW(
+				win.HANDLE(dir.handle),
+				&dir.async_buffer,
+				len(dir.async_buffer),
+				true, // NOTE: watch subdirectories
+				win.FILE_NOTIFY_CHANGE_LAST_WRITE,
+				nil,
+				&dir.overlapped,
+				nil,
+			)
+			fmt.assertf(ok == true, "Failed to watch directory for changes")
+			wait = false
+		} else {
+			err := win.GetLastError()
+			//fmt.printfln("ok: %v, err: %v, bytes_written: %v", ok, err, bytes_written)
+			fmt.assertf(
+				err == ERROR_IO_INCOMPLETE || err == ERROR_IO_PENDING,
+				"Failed to call GetOverlappedResult(), err: %v",
+				err,
+			)
 		}
 	}
 }
