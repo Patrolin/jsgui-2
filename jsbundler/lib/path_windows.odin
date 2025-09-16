@@ -26,7 +26,7 @@ open_dir_for_watching :: proc(dir_path: string) -> (dir: WatchedDir) {
 	dir.path = dir_path
 	dir.handle = DirHandle(
 		win.CreateFileW(
-			_string_to_wstring(dir_path),
+			_tprint_string_as_wstring(dir_path),
 			win.FILE_LIST_DIRECTORY,
 			win.FILE_SHARE_READ | win.FILE_SHARE_WRITE | win.FILE_SHARE_DELETE,
 			nil,
@@ -60,15 +60,15 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 		for {
 			// chess battle advanced
 			item := (^win.FILE_NOTIFY_INFORMATION)(&dir.async_buffer[offset])
-			wrelative_file_path_buffer := ([^]u16)(&item.file_name)[:item.file_name_length]
-			relative_file_path := _wstring_to_string(wrelative_file_path_buffer)
+			wrelative_file_path := ([^]u16)(&item.file_name)[:item.file_name_length]
+			relative_file_path := _tprint_wstring(string16(wrelative_file_path))
 			file_path := fmt.tprint(dir.path, relative_file_path, sep = "/")
+			wfile_path := _tprint_string_as_wstring(file_path)
 			//fmt.printfln("item: %v, file_path: %v", item, file_path)
-			wcfile_path := _string_to_wstring(file_path)
 
 			// wait for file_size to change..
 			file := win.CreateFileW(
-				wcfile_path,
+				wfile_path,
 				win.GENERIC_READ,
 				win.FILE_SHARE_READ | win.FILE_SHARE_WRITE | win.FILE_SHARE_DELETE,
 				nil,
@@ -144,13 +144,13 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 // file procs
 walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr), data: rawptr) {
 	path_to_search := fmt.tprint(dir_path, "*", sep = "\\")
-	wpath_to_search := _string_to_wstring(path_to_search)
+	wpath_to_search := _tprint_string_as_wstring(path_to_search)
 	find_result: win.WIN32_FIND_DATAW
 	find := win.FindFirstFileW(wpath_to_search, &find_result)
 	if find != win.INVALID_HANDLE_VALUE {
 		for {
-			relative_wpath := win.wstring(&find_result.cFileName[0])
-			relative_path := _wstring_to_string(relative_wpath)
+			relative_wpath := cstring16(&find_result.cFileName[0])
+			relative_path := _tprint_wstring(relative_wpath)
 			if relative_path != "." && relative_path != ".." {
 				is_dir :=
 					(find_result.dwFileAttributes & win.FILE_ATTRIBUTE_DIRECTORY) ==
@@ -169,7 +169,7 @@ walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr),
 }
 read_entire_file :: proc(file_path: string) -> (text: string, ok: bool) {
 	file := win.CreateFileW(
-		_string_to_wstring(file_path),
+		_tprint_string_as_wstring(file_path),
 		win.GENERIC_READ,
 		win.FILE_SHARE_READ,
 		nil,
@@ -195,7 +195,7 @@ read_entire_file :: proc(file_path: string) -> (text: string, ok: bool) {
 open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHandle, ok: bool) {
 	file = FileHandle(
 		win.CreateFileW(
-			_string_to_wstring(file_path),
+			_tprint_string_as_wstring(file_path),
 			win.GENERIC_WRITE,
 			win.FILE_SHARE_READ,
 			nil,

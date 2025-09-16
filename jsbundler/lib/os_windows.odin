@@ -26,6 +26,7 @@ PVOID :: rawptr
 PSTR :: [^]byte
 PCSTR :: cstring
 PCWSTR :: cstring16
+
 BOOL :: b32
 BYTE :: u8
 WORD :: u16
@@ -34,16 +35,25 @@ QWORD :: u64
 /* c types */
 SHORT :: i16
 USHORT :: u16
-INT :: i32
-UINT :: u32
 LONG :: i32
 ULONG :: u32
 LONGLONG :: i64
 ULONGLONG :: u64
+
+INT :: i32
+UINT :: u32
 /* -c types */
+SECURITY_DESCRIPTOR :: struct {
+	/*
+	Revision, Sbz1: BYTE,
+	Control:        SECURITY_DESCRIPTOR_CONTROL,
+	Owner, Group:   PSID,
+	Sacl, Dacl:     PACL,
+	*/
+}
 SECURITY_ATTRIBUTES :: struct {
 	nLength:              DWORD,
-	lpSecurityDescriptor: PVOID,
+	lpSecurityDescriptor: ^SECURITY_DESCRIPTOR,
 	bInheritHandle:       BOOL,
 }
 OVERLAPPED :: struct {
@@ -76,7 +86,7 @@ foreign kernel32 {
 	// file procs
 	CreateFileW :: proc(lpFileName: PCWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: ^SECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE) -> HANDLE ---
 	// IOCP procs
-	CreateTimerQueueTimer :: proc(timer: ^HANDLE, timer_queue: HANDLE, callback: WAITORTIMERCALLBACK, parameter: PVOID, timeout_ms, period_ms: DWORD, flags: ULONG) -> BOOL ---
+	CreateTimerQueueTimer :: proc(timer: ^HANDLE, timer_queue: HANDLE, callback: WAITORTIMERCALLBACK, parameter: rawptr, timeout_ms, period_ms: DWORD, flags: ULONG) -> BOOL ---
 	DeleteTimerQueueTimer :: proc(timer_queue: HANDLE, timer: HANDLE, event: HANDLE) ---
 	CancelIoEx :: proc(handle: HANDLE, overlapped: ^OVERLAPPED) -> BOOL ---
 }
@@ -89,7 +99,7 @@ foreign winsock_lib {
 	@(private)
 	WSAStartup :: proc(requested_version: WORD, winsock: ^WinsockData) -> INT ---
 	@(private)
-	WSAIoctl :: proc(s: Socket, dwIoControlCode: DWORD, lpvInBuffer: rawptr, cbInBuffer: DWORD, lpvOutBuffer: PVOID, cbOutBuffer: DWORD, lpcbBytesReturned: ^DWORD, lpOverlapped: ^OVERLAPPED, lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE) -> INT ---
+	WSAIoctl :: proc(s: Socket, dwIoControlCode: DWORD, lpvInBuffer: rawptr, cbInBuffer: DWORD, lpvOutBuffer: rawptr, cbOutBuffer: DWORD, lpcbBytesReturned: ^DWORD, lpOverlapped: ^OVERLAPPED, lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE) -> INT ---
 
 	@(private, link_name = "socket")
 	winsock_socket :: proc(address_type, connection_type, protocol: INT) -> Socket ---
@@ -105,29 +115,23 @@ foreign import winsock_ext_lib "system:Mswsock.lib"
 @(default_calling_convention = "c")
 foreign winsock_ext_lib {
 	@(private)
-	TransmitFile :: proc(socket: Socket, file: FileHandle, bytes_to_write, bytes_per_send: u32, overlapped: ^OVERLAPPED, transmit_buffers: ^TRANSMIT_FILE_BUFFERS, flags: u32) -> BOOL ---
+	TransmitFile :: proc(socket: Socket, file: FileHandle, bytes_to_write, bytes_per_send: DWORD, overlapped: ^OVERLAPPED, transmit_buffers: ^TRANSMIT_FILE_BUFFERS, flags: DWORD) -> BOOL ---
 }
 
 // helper procs
 _tprint_cstring16 :: proc(
 	wcstr: cstring16,
-	wstr_len: i32 = -1,
+	wlen_int := -1,
 	allocator := context.temp_allocator,
 ) -> string {
-	if intrinsics.expect(wstr_len == 0, false) {return ""}
+	wlen := i32(wlen_int)
+	assert(int(wlen) == wlen_int)
 
-	str_len := WideCharToMultiByte(
-		CP_UTF8,
-		WC_ERR_INVALID_CHARS,
-		wcstr,
-		wstr_len,
-		nil,
-		0,
-		nil,
-		nil,
-	)
-	assert(str_len != 0) // NOTE: Windows can return 0 if wstr_len == 0, otherwise it counts the null terminator and thus returns >0
-	if wstr_len == -1 {str_len -= 1}
+	if intrinsics.expect(wlen == 0, false) {return ""}
+
+	str_len := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wcstr, wlen, nil, 0, nil, nil)
+	assert(str_len != 0) // NOTE: Windows can return 0 if wlen == 0, otherwise it counts the null terminator and thus returns >0
+	if wlen == -1 {str_len -= 1}
 	if intrinsics.expect(str_len == 0, false) {return ""}
 
 	str_buf, err := make([^]byte, str_len, allocator = allocator)
@@ -136,7 +140,7 @@ _tprint_cstring16 :: proc(
 		CP_UTF8,
 		WC_ERR_INVALID_CHARS,
 		wcstr,
-		wstr_len,
+		wlen,
 		str_buf,
 		str_len,
 		nil,
@@ -147,11 +151,7 @@ _tprint_cstring16 :: proc(
 	return transmute(string)(str_buf[:str_len])
 }
 _tprint_string16 :: proc(wstr: string16, allocator := context.temp_allocator) -> string {
-	wcstr := transmute(cstring16)(raw_data(wstr))
-	wlen := len(wstr)
-	wlen_i32 := i32(wlen)
-	assert(int(wlen_i32) == wlen)
-	return _tprint_cstring16(wcstr, wlen_i32, allocator = allocator)
+	return _tprint_cstring16(cstring16(raw_data(wstr)), len(wstr), allocator = allocator)
 }
 _tprint_wstring :: proc {
 	_tprint_cstring16,
