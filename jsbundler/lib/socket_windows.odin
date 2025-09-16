@@ -10,29 +10,6 @@ import "core:time"
 WINSOCK_MAJOR_VERSION :: 2
 WINSOCK_MINOR_VERSION :: 2
 
-// constants
-WT_EXECUTEONLYONCE :: 0x8
-TF_DISCONNECT :: 0x1
-TF_REUSE_SOCKET :: 0x2
-
-WSADESCRIPTION_LEN :: 256
-WSASYS_STATUS_LEN :: 128
-SOMAXCONN :: max(i32)
-INVALID_SOCKET :: max(Socket)
-SOCKET_ERROR :: -1
-ERROR_CONNECTION_ABORTED :: 1236
-ERROR_OPERATION_ABORTED :: 995
-
-ADDRESS_TYPE_IPV4 :: 2
-ADDRESS_TYPE_IPV6 :: 23
-
-CONNECTION_TYPE_STREAM :: 1
-CONNECTION_TYPE_DGRAM :: 2
-
-PROTOCOL_TCP :: 6
-PROTOCOL_UDP :: 17
-
-
 // types
 WAITORTIMERCALLBACK :: proc "std" (lpParam: win.PVOID, TimerOrWaitFired: win.BOOLEAN)
 TRANSMIT_FILE_BUFFERS :: struct {
@@ -95,58 +72,10 @@ AsyncClientState :: enum {
 	ClosedByServer,
 }
 
-// globals
-@(private)
-_winsock: WinsockData
-
-// kernel32.lib imports
-foreign import kernel32 "system:Kernel32.lib"
-@(default_calling_convention = "c")
-foreign winsock_lib {
-	@(private)
-	CreateTimerQueueTimer :: proc(timer: ^win.HANDLE, timer_queue: win.HANDLE, callback: WAITORTIMERCALLBACK, parameter: win.PVOID, timeout_ms, period_ms: i32, flags: u32) -> win.BOOL ---
-	@(private)
-	DeleteTimerQueueTimer :: proc(timer_queue: win.HANDLE, timer: win.HANDLE, event: win.HANDLE) ---
-	@(private)
-	CancelIoEx :: proc(handle: win.HANDLE, overlapped: win.LPOVERLAPPED) -> win.BOOL ---
-}
-
-// socket imports
-// NOTE: WSAAPI is ignore on 64-bit windows
-foreign import winsock_lib "system:Ws2_32.lib"
-@(default_calling_convention = "c")
-foreign winsock_lib {
-	@(private)
-	WSAStartup :: proc(requested_version: u16, winsock: ^WinsockData) -> i32 ---
-	@(private)
-	WSAIoctl :: proc(s: Socket, dwIoControlCode: u32, lpvInBuffer: rawptr, cbInBuffer: u32, lpvOutBuffer: rawptr, cbOutBuffer: u32, lpcbBytesReturned: ^u32, lpOverlapped: ^win.OVERLAPPED, lpCompletionRoutine: win.LPWSAOVERLAPPED_COMPLETION_ROUTINE) -> i32 ---
-
-	@(private, link_name = "socket")
-	winsock_socket :: proc(address_type, connection_type, protocol: i32) -> Socket ---
-	@(private, link_name = "bind")
-	winsock_bind :: proc(socket: Socket, address: ^SocketAddress, address_size: i32) -> i32 ---
-	@(private, link_name = "listen")
-	winsock_listen :: proc(socket: Socket, n: i32) -> i32 ---
-	@(private, link_name = "closesocket")
-	winsock_closesocket :: proc(socket: Socket) -> i32 ---
-}
-
-foreign import winsock_ext_lib "system:Mswsock.lib"
-@(default_calling_convention = "c")
-foreign winsock_ext_lib {
-	@(private)
-	TransmitFile :: proc(socket: Socket, file: FileHandle, bytes_to_write, bytes_per_send: u32, overlapped: win.LPOVERLAPPED, transmit_buffers: ^TRANSMIT_FILE_BUFFERS, flags: u32) -> win.BOOL ---
-}
-
-// socket procs
-@(private)
-_u32_from_le :: proc(a, b: u16) -> u16 {
-	return a | (b << 8)
-}
 // NOTE: call this once per process
 init_sockets :: proc() {
 	fmt.assertf(
-		WSAStartup(_u32_from_le(WINSOCK_MAJOR_VERSION, WINSOCK_MINOR_VERSION), &_winsock) == 0,
+		WSAStartup(WINSOCK_MAJOR_VERSION | (WINSOCK_MINOR_VERSION << 8), &_winsock) == 0,
 		"Failed to initialize Winsock %v.%v",
 		WINSOCK_MAJOR_VERSION,
 		WINSOCK_MINOR_VERSION,
