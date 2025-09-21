@@ -41,7 +41,8 @@ open_dir_for_watching :: proc(dir_path: string) -> (dir: WatchedDir) {
 		dir.handle,
 		&dir.async_buffer[0],
 		len(dir.async_buffer),
-		true, // NOTE: watch subdirectories
+		true,
+		/* NOTE: watch subdirectories */
 		FILE_NOTIFY_CHANGE_LAST_WRITE,
 		nil,
 		&dir.overlapped,
@@ -66,7 +67,6 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			relative_file_path := _tprint_wstring(string16(wrelative_file_path))
 			file_path := fmt.tprint(dir.path, relative_file_path, sep = "/")
 			wfile_path := _tprint_string_as_wstring(file_path)
-			//fmt.printfln("item: %v, file_path: %v", item, file_path)
 
 			// wait for file_size to change..
 			file := CreateFileW(
@@ -88,6 +88,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 				time.sleep(time.Microsecond)
 				GetFileSizeEx(FileHandle(file), &file_size)
 			}
+
 			// get the next item
 			offset = item.next_entry_offset
 			if offset == 0 {break}
@@ -99,7 +100,6 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 	wait := true
 	for {
 		/* NOTE: windows will give us multiple notifications per file (truncate (or literally nothing) + the start of each write) */
-		//fmt.printfln("watching dir: '%v', wait: %v", dir.path, wait)
 		wait_result := WaitForSingleObject(dir.overlapped.hEvent, wait ? INFINITE : 1)
 		if wait_result == WAIT_TIMEOUT {break}
 		fmt.assertf(
@@ -110,7 +110,6 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 		ok := GetOverlappedResult(HANDLE(dir.handle), &dir.overlapped, &bytes_written, true)
 		if ok {
 			/* NOTE: windows in its infinite wisdom can signal us with 0 bytes written, with no way to know what actually changed... */
-			//fmt.printfln("ok: %v, bytes_written: %v", ok, bytes_written)
 			if bytes_written > 0 {wait_for_writes_to_finish(dir)}
 			// NOTE: only reset the event after windows has finished writing the changes
 			fmt.assertf(ResetEvent(dir.overlapped.hEvent) == true, "Failed to reset event")
@@ -128,7 +127,6 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			wait = false
 		} else {
 			err := GetLastError()
-			//fmt.printfln("ok: %v, err: %v, bytes_written: %v", ok, err, bytes_written)
 			fmt.assertf(
 				err == ERROR_IO_INCOMPLETE || err == ERROR_IO_PENDING,
 				"Failed to call GetOverlappedResult(), err: %v",

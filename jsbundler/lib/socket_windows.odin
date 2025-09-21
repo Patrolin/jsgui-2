@@ -92,7 +92,6 @@ create_server_socket :: proc(server: ^Server, port: u16, thread_count := 1) {
 		0,
 		"Failed to setup async accept",
 	)
-	//fmt.printfln("bytes_written: %v", bytes_written)
 	for i in 0 ..< thread_count {_accept_client_async(server)}
 	return
 }
@@ -272,7 +271,6 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 			fmt.assertf(false, "Failed to get next socket event, err: %v", err)
 		}
 	}
-	//fmt.printfln("state.1: %v, client: %v", client.state, client.socket)
 
 	on_timeout :: proc "std" (user_ptr: rawptr, _TimerOrWaitFired: BOOL) {
 		client := (^AsyncClient)(user_ptr)
@@ -313,7 +311,6 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 		)
 	// TODO: parse address via GetAcceptExSockaddrs()?
 	case .Reading:
-		//fmt.printfln("bytes_received: %v", event_bytes)
 		if event_bytes == 0 {
 			// NOTE: presumably this means we're out of memory in the async_read_buffer?
 			client.state = .ClosedByClient
@@ -331,12 +328,10 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 	case .ClosedByServer:
 		assert(false, "Race condition!")
 	}
-	//fmt.printfln("state.2: %v", client.state)
 	return
 }
 handle_socket_event :: proc(server: ^Server, client: ^AsyncClient) {
 	// TODO: move this to user code?
-	//fmt.printfln("state.3: %v", client.state)
 	switch client.state {
 	case .New:
 		client.state = .Reading
