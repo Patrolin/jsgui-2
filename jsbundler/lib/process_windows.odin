@@ -1,4 +1,5 @@
 package lib
+import "core:fmt"
 
 // process procs
 get_args :: proc(allocator := context.temp_allocator) -> (args: [dynamic]string) {

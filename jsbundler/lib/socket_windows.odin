@@ -3,7 +3,6 @@ import "base:intrinsics"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
-import win "core:sys/windows"
 import "core:time"
 
 // params
@@ -11,55 +10,26 @@ WINSOCK_MAJOR_VERSION :: 2
 WINSOCK_MINOR_VERSION :: 2
 
 // types
-WAITORTIMERCALLBACK :: proc "std" (lpParam: win.PVOID, TimerOrWaitFired: win.BOOLEAN)
-TRANSMIT_FILE_BUFFERS :: struct {
-	head:        rawptr,
-	head_length: u32,
-	tail:        rawptr,
-	tail_length: u32,
-}
-
-WinsockData :: struct {
-	wVersion:       u16,
-	wHighVersion:   u16,
-	iMaxSockets:    u16,
-	iMaxUdpDg:      u16,
-	lpVendorInfo:   ^u8,
-	szDescription:  [WSADESCRIPTION_LEN + 1]byte,
-	szSystemStatus: [WSASYS_STATUS_LEN + 1]byte,
-}
-
-SocketAddress :: union {
-	SocketAddressIpv4,
-}
-SocketAddressIpv4 :: struct {
-	family:    u16,
-	port:      u16be,
-	ip:        u32be,
-	_reserved: [8]byte,
-}
-#assert(size_of(SocketAddressIpv4) == 16)
-
-Socket :: win.SOCKET
+Socket :: SOCKET
 Server :: struct {
 	socket:   Socket,
 	address:  SocketAddress,
-	iocp:     win.HANDLE,
-	AcceptEx: win.LPFN_ACCEPTEX,
+	iocp:     HANDLE,
+	AcceptEx: ACCEPT_EX,
 }
 AsyncClient :: struct {
 	// windows nonsense, NOTE: must be first field of struct
-	overlapped:            win.OVERLAPPED `fmt:"-"`,
+	overlapped:            OVERLAPPED `fmt:"-"`,
 	socket:                Socket,
 	address:               SocketAddress,
 	state:                 AsyncClientState,
-	timeout_timer:         win.HANDLE,
-	async_write_file_path: win.wstring,
+	timeout_timer:         HANDLE,
+	async_write_file_path: CWSTR,
 	async_write_file:      FileHandle,
 	async_write_slice:     TRANSMIT_FILE_BUFFERS `fmt:"-"`,
 	async_rw_prev_pos:     int,
 	async_rw_pos:          int,
-	async_rw_slice:        win.WSABUF `fmt:"-"`,
+	async_rw_slice:        WSABUF `fmt:"-"`,
 	async_rw_buffer:       [2048]byte `fmt:"-"`,
 }
 AsyncClientState :: enum {
@@ -87,33 +57,30 @@ create_server_socket :: proc(server: ^Server, port: u16, thread_count := 1) {
 		ip     = u32be(0), // NOTE: 0.0.0.0
 		port   = u16be(port),
 	}
-	server.socket = winsock_socket(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP)
+	server.socket = socket(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP)
 	fmt.assertf(server.socket != INVALID_SOCKET, "Failed to create a server socket")
 
 	fmt.assertf(
-		winsock_bind(server.socket, &server.address, size_of(SocketAddressIpv4)) == 0,
+		bind(server.socket, &server.address, size_of(SocketAddressIpv4)) == 0,
 		"Failed to bind the server socket",
 	)
 
-	fmt.assertf(
-		winsock_listen(server.socket, SOMAXCONN) == 0,
-		"Failed to listen to the server socket",
-	)
+	fmt.assertf(listen(server.socket, SOMAXCONN) == 0, "Failed to listen to the server socket")
 
-	server.iocp = win.CreateIoCompletionPort(win.INVALID_HANDLE_VALUE, nil, 0, 0)
+	server.iocp = CreateIoCompletionPort(INVALID_HANDLE, nil, 0, 0)
 	fmt.assertf(server.iocp != nil, "Failed to create an IOCP port")
 
 	fmt.assertf(
-		win.CreateIoCompletionPort(win.HANDLE(server.socket), server.iocp, 0, 0) == server.iocp,
+		CreateIoCompletionPort(HANDLE(server.socket), server.iocp, 0, 0) == server.iocp,
 		"Failed to listen to the server socket via IOCP",
 	)
 
-	accept_ex_guid := win.WSAID_ACCEPTEX
+	accept_ex_guid := WSAID_ACCEPTEX
 	bytes_written: u32 = 0
 	fmt.assertf(
 		WSAIoctl(
 			server.socket,
-			win.SIO_GET_EXTENSION_FUNCTION_POINTER,
+			SIO_GET_EXTENSION_FUNCTION_POINTER,
 			&accept_ex_guid,
 			size_of(accept_ex_guid),
 			&server.AcceptEx,
@@ -132,13 +99,13 @@ create_server_socket :: proc(server: ^Server, port: u16, thread_count := 1) {
 @(private)
 _accept_client_async :: proc(server: ^Server) {
 	client := new(AsyncClient) // TODO: how does one allocate a nonzerod struct in Odin?
-	client.socket = win.WSASocketW(
+	client.socket = WSASocketW(
 		ADDRESS_TYPE_IPV4,
 		CONNECTION_TYPE_STREAM,
 		PROTOCOL_TCP,
 		nil,
 		0,
-		win.WSA_FLAG_OVERLAPPED,
+		WSA_FLAG_OVERLAPPED,
 	)
 	fmt.assertf(client.socket != INVALID_SOCKET, "Failed to create a client socket")
 	bytes_received: u32 = ---
@@ -153,9 +120,9 @@ _accept_client_async :: proc(server: ^Server) {
 		&bytes_received,
 		&client.overlapped,
 	)
-	err := win.GetLastError()
+	err := GetLastError()
 	fmt.assertf(
-		ok == true || err == win.ERROR_IO_PENDING,
+		ok == true || err == ERROR_IO_PENDING,
 		"Failed to accept asynchronously, err: %v",
 		err,
 	)
@@ -163,24 +130,24 @@ _accept_client_async :: proc(server: ^Server) {
 @(private)
 _receive_client_data_async :: proc(client: ^AsyncClient) {
 	client.async_rw_slice = {
-		buf = &client.async_rw_buffer[client.async_rw_pos],
-		len = u32(len(client.async_rw_buffer) - client.async_rw_pos),
+		buffer = &client.async_rw_buffer[client.async_rw_pos],
+		len    = u32(len(client.async_rw_buffer) - client.async_rw_pos),
 	}
 	flags: u32 = 0
 
 	client.overlapped = {}
-	has_error := win.WSARecv(
+	has_error := WSARecv(
 		client.socket,
 		&client.async_rw_slice,
 		1,
 		nil,
 		&flags,
-		win.LPWSAOVERLAPPED(&client.overlapped),
+		&client.overlapped,
 		nil,
 	)
-	err := win.WSAGetLastError()
+	err := WSAGetLastError()
 	fmt.assertf(
-		has_error == 0 || err == win.WSA_IO_PENDING,
+		has_error == 0 || err == WSA_IO_PENDING,
 		"Failed to read data asynchronously, %v",
 		err,
 	)
@@ -197,26 +164,26 @@ open_file_for_response :: proc(
 	file_size: int,
 	ok: bool,
 ) {
-	client.async_write_file_path = _string_to_wstring(file_path, allocator = context.allocator)
+	client.async_write_file_path = _tprint_string_as_wstring(
+		file_path,
+		allocator = context.allocator,
+	)
 	file = FileHandle(
-		win.CreateFileW(
+		CreateFileW(
 			client.async_write_file_path,
-			win.GENERIC_READ,
-			win.FILE_SHARE_READ | win.FILE_SHARE_WRITE,
+			GENERIC_READ,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
 			nil,
-			win.OPEN_EXISTING,
-			win.FILE_ATTRIBUTE_NORMAL | win.FILE_FLAG_SEQUENTIAL_SCAN,
+			F_OPEN,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
 			nil,
 		),
 	)
 	client.async_write_file = file
-	win_file_size: win.LARGE_INTEGER = ---
-	fmt.assertf(
-		win.GetFileSizeEx(win.HANDLE(file), &win_file_size) == true,
-		"Failed to get file size",
-	)
+	win_file_size: LARGE_INTEGER = ---
+	fmt.assertf(GetFileSizeEx(file, &win_file_size) == true, "Failed to get file size")
 	file_size = int(win_file_size)
-	ok = file != FileHandle(win.INVALID_HANDLE_VALUE)
+	ok = file != FileHandle(INVALID_HANDLE)
 	return
 }
 send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte) {
@@ -243,7 +210,7 @@ send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte
 	client.async_rw_pos = 0
 	client.async_rw_slice = {}
 	client.async_write_slice = {
-		head        = &client.async_rw_buffer,
+		head        = &client.async_rw_buffer[0],
 		head_length = u32(len(header)),
 	}
 
@@ -257,30 +224,23 @@ send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte
 		&client.async_write_slice,
 		TF_DISCONNECT | TF_REUSE_SOCKET,
 	)
-	err := win.WSAGetLastError()
-	fmt.assertf(ok == true || err == win.WSA_IO_PENDING, "Failed to send response, err: %v", err)
+	err := WSAGetLastError()
+	fmt.assertf(ok == true || err == WSA_IO_PENDING, "Failed to send response, err: %v", err)
 }
 cancel_timeout :: proc "std" (client: ^AsyncClient) {
 	DeleteTimerQueueTimer(nil, client.timeout_timer, nil)
 }
 cancel_io_and_close_client :: proc "std" (client: ^AsyncClient) {
-	CancelIoEx(win.HANDLE(client.socket), nil)
+	CancelIoEx(HANDLE(client.socket), nil)
 	close_client(client)
 }
 close_client :: proc "std" (client: ^AsyncClient) {
-	winsock_closesocket(client.socket)
+	closesocket(client.socket)
 	cancel_timeout(client)
 	switch client.state {
 	case .New, .Reading, .SendingResponseAndClosing:
 		client.state = .ClosedByServer
 	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
-	}
-}
-@(private)
-_on_timeout :: proc "std" (lpParam: rawptr, _TimerOrWaitFired: win.BOOLEAN) {
-	client := (^AsyncClient)(lpParam)
-	if client.state == .Reading {
-		cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send an ERROR_OPERATION_ABORTED
 	}
 }
 /* usage:
@@ -292,15 +252,15 @@ _on_timeout :: proc "std" (lpParam: rawptr, _TimerOrWaitFired: win.BOOLEAN) {
 */
 wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 	event_bytes: u32 = ---
-	key: uint
-	ok := win.GetQueuedCompletionStatus(
+	user_ptr: rawptr
+	ok := GetQueuedCompletionStatus(
 		server.iocp,
 		&event_bytes,
-		&key,
-		(^^win.OVERLAPPED)(&client),
-		win.INFINITE,
+		&user_ptr,
+		(^^OVERLAPPED)(&client),
+		INFINITE,
 	)
-	err := win.GetLastError()
+	err := GetLastError()
 	if !ok {
 		switch err {
 		case ERROR_CONNECTION_ABORTED:
@@ -314,20 +274,25 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 	}
 	//fmt.printfln("state.1: %v, client: %v", client.state, client.socket)
 
+	on_timeout :: proc "std" (user_ptr: rawptr, _TimerOrWaitFired: BOOL) {
+		client := (^AsyncClient)(user_ptr)
+		if client.state == .Reading {
+			cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send an ERROR_OPERATION_ABORTED
+		}
+	}
 	switch client.state {
 	case .New:
 		// accept a new connection
 		fmt.assertf(
-			win.CreateIoCompletionPort(win.HANDLE(client.socket), server.iocp, 0, 0) ==
-			server.iocp,
+			CreateIoCompletionPort(HANDLE(client.socket), server.iocp, 0, 0) == server.iocp,
 			"Failed to listen to the client socket with IOCP",
 		)
 		fmt.assertf(
-			win.setsockopt(
+			setsockopt(
 				client.socket,
-				win.SOL_SOCKET,
-				win.SO_UPDATE_ACCEPT_CONTEXT,
-				rawptr(&server.socket),
+				SOL_SOCKET,
+				SO_UPDATE_ACCEPT_CONTEXT,
+				&server.socket,
 				size_of(Socket),
 			) ==
 			0,
@@ -337,7 +302,7 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 			CreateTimerQueueTimer(
 				&client.timeout_timer,
 				nil,
-				_on_timeout,
+				on_timeout,
 				client,
 				1000,
 				0,
@@ -384,7 +349,7 @@ handle_socket_event :: proc(server: ^Server, client: ^AsyncClient) {
 	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
 		client.state = .ClosedByServer
 		if client.async_write_file != nil {
-			win.CloseHandle(win.HANDLE(client.async_write_file))
+			CloseHandle(HANDLE(client.async_write_file))
 			free(rawptr(client.async_write_file_path))
 		}
 		free(client)

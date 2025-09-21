@@ -9,12 +9,12 @@ import "core:text/regex"
 import "core:thread" // NOTE: this adds 19 KiB to the exe size
 import "lib"
 
-// constants
-SRC_PATH :: "src"
-
 // globals
 serve_http := true
 serve_port: u16 = 3000
+
+// constants
+SRC_PATH :: "src"
 
 print_help_and_exit :: proc() {
 	fmt.println("  jsbundler help    - print this")
