@@ -138,7 +138,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 
 // file procs
 /* NOTE: same caveats as wait_for_file_changes() */
-walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr), data: rawptr) {
+walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr), data: rawptr = nil) {
 	path_to_search := fmt.tprint(dir_path, "*", sep = "\\")
 	wpath_to_search := _tprint_string_as_wstring(path_to_search)
 	find_result: WIN32_FIND_DATAW

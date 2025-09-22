@@ -8,7 +8,7 @@
  * @property {number} _nextIndex
  */
 /**
- * @typedef {Record<string, string | number | boolean | undefined | null> & {scrollX?: boolean; scrollY?: boolean; flex?: "x" | "x-reverse" | "y" | "y-reverse"; flexAlign?: "center" | "justify" | "start" | "scroll"}} HTMLAttributes
+ * @typedef {Record<string, string | number | boolean | undefined | null> & {scrollX?: boolean; scrollY?: boolean; flex?: "x" | "x-justify" | "x-start" | "x-scroll" | "y" | "y-justify" | "y-start" | "y-scroll"; flexAlign?: "center" | "start" | "stretch"}} HTMLAttributes
  */
 /**
  * @typedef {Record<string, string | number | undefined | null>} CSSVars

@@ -62,13 +62,13 @@ function App(body) {
     lineCount: 2,
   });
 
-  const header = div(body, { width: "100%", height: 56, padding: "0 16px", attributes: {flex: "x", flexAlign: "justify"} });
+  const header = div(body, { width: "100%", height: 56, padding: "0 16px", attributes: {flex: "x-justify"} });
 
   headerLeft(header);
   headerMiddle(header);
   headerRight(header);
 
-  const main = div(body, { width: "100%", padding: "8px 24px", attributes: {flex: "x", flexAlign: "start"}, columnGap: 16 });
+  const main = div(body, { width: "100%", padding: "8px 24px", attributes: {flex: "x-start"}, columnGap: 16 });
   const mainLeft = div(main, { attributes: {flex: "y"} });
   for (let i = 0; i < state.lineCount; i++) {
     span(mainLeft, `Lorem ipsum ${i}`, { width: "100%" });
