@@ -58,8 +58,11 @@ function headerRight(header) {
 /**
  * @param {Component} body */
 function App(body) {
-  const state = useState(body, "App", {
-    lineCount: 2,
+  const state = useState(body, {
+    key: "App",
+    value: {
+      lineCount: 2,
+    },
   });
 
   const header = div(body, { width: "100%", height: 56, padding: "0 16px", attributes: {flex: "x-justify"} });

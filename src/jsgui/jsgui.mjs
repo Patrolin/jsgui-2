@@ -131,7 +131,7 @@ export function _getChildInfo(parent, key, tagName, defaultState = {}) {
  * @param {Component} info */
 function _appendOrMoveElement(parent, info) {
   const element = info.element;
-  if (element == null) return; // NOTE: things like useState() store data, but have no element
+  if (element == null) return; /* NOTE: things like useState() store data, but have no element */
 
   info._nextChild = /** @type {HTMLElement | null} */(element.firstElementChild);
   if (element === parent._nextChild) {
@@ -156,12 +156,18 @@ export function getElement(parent, tagName, props = {}) {
 // hooks
 /**
  * @template T
+ * @typedef {Object} UseStateProps
+ * @property {string} [key] - required if you want to call this in arbitrary order, else same rules as React
+ * @property {T} value
+ */
+/**
+ * @template T
  * @param {Component} parent
- * @param {string} key
- * @param {T} defaultState
+ * @param {UseStateProps<T>} props
  * @returns {T} */
-export function useState(parent, key = "", defaultState) {
-  const info = _getChildInfo(parent, `useState(${key})`, undefined, /** @type {any} */(defaultState));
+export function useState(parent, props) {
+  const {key = "", value} = props;
+  const info = _getChildInfo(parent, `useState(${key})`, undefined, /** @type {any} */(value));
   const { state } = info;
   return state;
 }
@@ -207,10 +213,13 @@ export function useGetRequest(parent, props) {
   let defaultValue;
   if (!("defaultValue" in props)) defaultValue = [];
   else {defaultValue = props.defaultValue};
-  const state = useState(parent, `useGetRequest.${key}`, {
-    prevRefetchOn: /** @type {string | null} */(null),
-    loading: true,
-    value: /** @type {T} */(defaultValue),
+  const state = useState(parent, {
+    key: `useGetRequest.${key}`,
+    value: {
+      prevRefetchOn: /** @type {string | null} */(null),
+      loading: true,
+      value: /** @type {T} */(defaultValue),
+    },
   });
   const refetch = () => {
     if (state.loading === false) {
@@ -534,12 +543,14 @@ export function webgl(parent, props, webglProps) {
   const info = getElement(parent, "canvas", props);
   const node = /** @type {HTMLCanvasElement} */(info.element);
   // TODO: type check the state
-  const state = useState(info, "webgl", /** @type {any} */({
-    gl: null,
-    programs: null,
-    rect: new DOMRect(),
-    didCompile: false,
-  }));
+  const state = useState(info, {
+    value: /** @type {any} */({
+      gl: null,
+      programs: null,
+      rect: new DOMRect(),
+      didCompile: false,
+    }),
+  });
   if (state.gl == null) {
     const gl = node.getContext("webgl2");
     if (!gl) return;
