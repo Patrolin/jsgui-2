@@ -99,22 +99,22 @@ foreign kernel32 {
 // helper procs
 @(private = "file")
 tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocator) -> string {
-	wlen_i32 := i32(wlen)
-	assert(int(wlen_i32) == wlen)
+	wlen_cint := CINT(wlen)
+	assert(int(wlen_cint) == wlen)
 
-	if intrinsics.expect(wlen_i32 == 0, false) {return ""}
+	if intrinsics.expect(wlen_cint == 0, false) {return ""}
 
 	cstr_len := WideCharToMultiByte(
 		CP_UTF8,
 		WC_ERR_INVALID_CHARS,
 		cwstr,
-		wlen_i32,
+		wlen_cint,
 		nil,
 		0,
 		nil,
 		nil,
 	)
-	/* NOTE: Windows can return 0 if wlen_i32 == 0, otherwise it counts the null terminator and thus returns >0 */
+	/* NOTE: Windows counts the null terminator if wlen == -1 */
 	str_len := cstr_len - (wlen == -1 ? 1 : 0)
 	if intrinsics.expect(str_len == 0, false) {return ""}
 
@@ -124,7 +124,7 @@ tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocat
 		CP_UTF8,
 		WC_ERR_INVALID_CHARS,
 		cwstr,
-		wlen_i32,
+		wlen_cint,
 		&str_buf[0],
 		cstr_len,
 		nil,
@@ -143,10 +143,10 @@ tprint_wstring :: proc {
 }
 tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator) -> CWSTR {
 	str_len := len(str)
-	str_len_i32 := i32(str_len)
-	assert(int(str_len_i32) == str_len)
+	str_len_cint := CINT(str_len)
+	assert(int(str_len_cint) == str_len)
 
-	wlen := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(str), str_len_i32, nil, 0)
+	wlen := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(str), str_len_cint, nil, 0)
 	assert(wlen != 0)
 	cwlen := wlen + 1
 	cwstr_buf := make([]u16, cwlen, allocator = allocator)
@@ -155,7 +155,7 @@ tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocato
 		CP_UTF8,
 		MB_ERR_INVALID_CHARS,
 		raw_data(str),
-		str_len_i32,
+		str_len_cint,
 		&cwstr_buf[0],
 		cwlen,
 	)

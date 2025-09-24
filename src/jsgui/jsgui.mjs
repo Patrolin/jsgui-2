@@ -182,7 +182,7 @@ export function div(parent, props) {
  * @returns {Component} */
 export function span(parent, text, props) {
   const info = getElement(parent, "span", props);
-  info.element.textContent = /** @type {any} */(text);
+  info.element.textContent = /** @type {any} */(text); /* NOTE: this overwrites all child nodes */
   return info;
 }
 /**
@@ -192,7 +192,7 @@ export function span(parent, text, props) {
  * @returns {Component} */
 export function link(parent, text, props) {
   const info = getElement(parent, "a", props);
-  info.element.textContent = /** @type {any} */(text);
+  if (text) span(info, text); /* NOTE: don't overwrite child nodes */
   return info;
 }
 /**

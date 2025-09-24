@@ -78,7 +78,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 		for {
 			// chess battle advanced
 			item := (^FILE_NOTIFY_INFORMATION)(&dir.async_buffer[offset])
-			wrelative_file_path := ([^]u16)(&item.file_name)[:item.file_name_length]
+			wrelative_file_path := ([^]u16)(&item.file_name)[:item.file_name_length >> 1]
 			relative_file_path := tprint_wstring(string16(wrelative_file_path))
 			file_path := fmt.tprint(dir.path, relative_file_path, sep = "/")
 			wfile_path := tprint_string_as_wstring(file_path)
@@ -100,7 +100,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			file_size: LARGE_INTEGER = 0
 			for file_size != prev_file_size {
 				prev_file_size = file_size
-				time.sleep(time.Microsecond)
+				time.sleep(1 * time.Microsecond)
 				GetFileSizeEx(FileHandle(file), &file_size)
 			}
 
@@ -187,7 +187,7 @@ read_file :: proc(file_path: string) -> (text: string, ok: bool) {
 	file := CreateFileW(
 		tprint_string_as_wstring(file_path),
 		GENERIC_READ,
-		FILE_SHARE_READ,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
 		nil,
 		F_OPEN,
 		0,
