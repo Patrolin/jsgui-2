@@ -43,28 +43,32 @@ li {
   overflow: unset;
 }
 li > * {
-  vertical-align: bottom;
+  vertical-align: middle;
 }
 
 /* font-size */
 h1 {
-  --font-size: 20px;
+  font-size: 20px;
+  --line-height: 28px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 700;
 }
 h2 {
-  --font-size: 16px;
+  font-size: 16px;
+  --line-height: 22px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 500;
 }
 body, h3 {
-  --font-size: 14px;
+  font-size: 14px;
+  --line-height: 20px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 400;
 }
 h4, h5, h6 {
-  --font-size: 12px;
+  font-size: 12px;
+  --line-height: 16px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 400;
 }
 h1, h2, h3, h4, h5, h6, span, a {
-  line-height: round(down, calc(var(--fontSize) * 1.4));
+  line-height: var(--line-height);
 }
 
 /* svg */
