@@ -24,7 +24,7 @@ get_args :: proc(allocator := context.temp_allocator) -> (args: [dynamic]string)
 			j += 1
 		}
 		warg := string16(wbuf[i:j])
-		append(&args, _tprint_wstring(warg, allocator = allocator))
+		append(&args, tprint_wstring(warg, allocator = allocator))
 
 		i = j
 		if end_char != 0 && wbuf[j] == end_char {

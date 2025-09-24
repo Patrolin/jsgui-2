@@ -14,17 +14,32 @@ serve_http := true
 serve_port: u16 = 3000
 
 // constants
-SRC_PATH :: "src"
+SRC_PATH :: "src" /* NOTE: FILES_TO_INIT need hardcoded paths.. */
+JSGUI_VERSION :: #load("../src/jsgui/jsgui_version.txt", string)
+FileToInit :: struct {
+	path: string,
+	// if data == "" {Create a directory} else {Create a file}
+	data: string,
+}
+FILES_TO_INIT :: []FileToInit {
+	{"src", ""},
+	{"src/jsgui", ""},
+	{"src/jsgui/jsgui_version.txt", JSGUI_VERSION},
+	{"src/jsgui/jsgui.css", #load("../src/jsgui/jsgui.css")},
+	{"src/jsgui/jsgui.mjs", #load("../src/jsgui/jsgui.mjs")},
+	{"src/jsgui/types", ""},
+	{"src/jsgui/types/jsgui_types.d.js", #load("../src/jsgui/types/jsgui_types.d.js")},
+}
 
 print_help_and_exit :: proc() {
-	fmt.println("  jsbundler help    - print this")
-	fmt.println("  jsbundler version - print the version number")
-	fmt.println("  jsbundler init    - copy the bundled jsgui into src/jsgui")
 	fmt.printfln(
 		"  jsbundler [port]  - serve at [port=%v] and rebuild when files change",
 		serve_port,
 	)
 	fmt.println("  jsbundler build   - build and exit")
+	fmt.println("  jsbundler help    - print this")
+	fmt.println("  jsbundler version - print the version number")
+	fmt.println("  jsbundler init    - copy the bundled jsgui version into src/jsgui")
 	lib.exit_process()
 }
 main :: proc() {
@@ -32,12 +47,20 @@ main :: proc() {
 	if len(args) > 1 {
 		second_arg := args[1]
 		if second_arg == "help" || len(args) > 2 {
+			fmt.printfln("v%v:", JSGUI_VERSION[:len(JSGUI_VERSION) - 1])
 			print_help_and_exit()
 		} else if second_arg == "version" {
-			fmt.printfln("version: 0.1")
+			fmt.printfln("v%v", JSGUI_VERSION[:len(JSGUI_VERSION) - 1])
 			lib.exit_process()
 		} else if second_arg == "init" {
-			assert(false, "TODO: init jsgui")
+			for file_to_init in FILES_TO_INIT {
+				if file_to_init.data == "" {
+					lib.create_dir_if_not_exists(file_to_init.path)
+				} else {
+					fmt.printfln("+ %v", file_to_init.path)
+					lib.write_file_atomically(file_to_init.path, file_to_init.data)
+				}
+			}
 			lib.exit_process()
 		} else if second_arg == "build" {
 			serve_http = false
@@ -75,11 +98,11 @@ rebuild_index_file :: proc() {
 		extension_index := strings.last_index_byte(next_path, '.')
 		extension := next_path[extension_index:]
 		if extension == ".js" || extension == ".mjs" {
-			file_text, ok := lib.read_entire_file(next_path)
+			file_text, ok := lib.read_file(next_path)
 			fmt.assertf(ok, "Failed to read file '%v'", next_path)
 			append(&walk_data.js_texts, string(file_text))
 		} else if extension == ".css" {
-			file_text, ok := lib.read_entire_file(next_path)
+			file_text, ok := lib.read_file(next_path)
 			fmt.assertf(ok, "Failed to read file '%v'", next_path)
 			append(&walk_data.css_texts, string(file_text))
 		}
@@ -88,11 +111,11 @@ rebuild_index_file :: proc() {
 
 	index_file, ok := lib.open_file_for_writing_and_truncate("index.html")
 	assert(ok, "Failed to open file 'index.html'")
-	lib.write(index_file, "<!DOCTYPE html>\n<head>\n<style>\n")
+	lib.write_to_file(index_file, "<!DOCTYPE html>\n<head>\n<style>\n")
 	for css_text in walk_data.css_texts {
-		lib.write(index_file, css_text)
+		lib.write_to_file(index_file, css_text)
 	}
-	lib.write(index_file, "</style>\n<script>\n")
+	lib.write_to_file(index_file, "</style>\n<script>\n")
 	for js_text in walk_data.js_texts {
 		i := 0
 		for i < len(js_text) && (js_text[i] == '\r' || js_text[i] == '\n') {
@@ -104,7 +127,7 @@ rebuild_index_file :: proc() {
 		match, index, ok := regex.match_iterator(&iterator)
 		for ok {
 			j := match.pos[0][0]
-			if i < j {lib.write(index_file, js_text[i:j])}
+			if i < j {lib.write_to_file(index_file, js_text[i:j])}
 
 			i = match.pos[0][1]
 			for i < len(js_text) && (js_text[i] == '\r' || js_text[i] == '\n') {
@@ -113,9 +136,9 @@ rebuild_index_file :: proc() {
 
 			match, index, ok = regex.match_iterator(&iterator)
 		}
-		lib.write(index_file, js_text[i:])
+		lib.write_to_file(index_file, js_text[i:])
 	}
-	lib.write(index_file, "</script>")
+	lib.write_to_file(index_file, "</script>")
 	lib.close_file(index_file)
 	fmt.printf("\r- Bundled into index.html")
 }

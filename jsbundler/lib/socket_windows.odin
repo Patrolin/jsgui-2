@@ -163,7 +163,7 @@ open_file_for_response :: proc(
 	file_size: int,
 	ok: bool,
 ) {
-	client.async_write_file_path = _tprint_string_as_wstring(
+	client.async_write_file_path = tprint_string_as_wstring(
 		file_path,
 		allocator = context.allocator,
 	)

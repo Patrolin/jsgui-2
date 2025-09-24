@@ -17,13 +17,28 @@ WatchedDir :: struct {
 	async_buffer: [2048]byte `fmt:"-"`,
 }
 
+// path procs
+move_path_atomically :: proc(src_path, dest_path: string) {
+	result := MoveFileExW(
+		tprint_string_as_wstring(src_path),
+		tprint_string_as_wstring(dest_path),
+		MOVEFILE_REPLACE_EXISTING,
+	)
+	fmt.assertf(bool(result), "Failed to move path: '%v' to '%v'", src_path, dest_path)
+}
+
 // dir procs
+create_dir_if_not_exists :: proc(dir_path: string) -> (ok: bool) {
+	CreateDirectoryW(tprint_string_as_wstring(dir_path), nil)
+	err := GetLastError()
+	return err != ERROR_PATH_NOT_FOUND
+}
 open_dir_for_watching :: proc(dir_path: string) -> (dir: WatchedDir) {
 	// open dir
 	dir.path = dir_path
 	dir.handle = DirHandle(
 		CreateFileW(
-			_tprint_string_as_wstring(dir_path),
+			tprint_string_as_wstring(dir_path),
 			FILE_LIST_DIRECTORY,
 			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 			nil,
@@ -64,9 +79,9 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			// chess battle advanced
 			item := (^FILE_NOTIFY_INFORMATION)(&dir.async_buffer[offset])
 			wrelative_file_path := ([^]u16)(&item.file_name)[:item.file_name_length]
-			relative_file_path := _tprint_wstring(string16(wrelative_file_path))
+			relative_file_path := tprint_wstring(string16(wrelative_file_path))
 			file_path := fmt.tprint(dir.path, relative_file_path, sep = "/")
-			wfile_path := _tprint_string_as_wstring(file_path)
+			wfile_path := tprint_string_as_wstring(file_path)
 
 			// wait for file_size to change..
 			file := CreateFileW(
@@ -138,15 +153,19 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 
 // file procs
 /* NOTE: same caveats as wait_for_file_changes() */
-walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr), data: rawptr = nil) {
+walk_files :: proc(
+	dir_path: string,
+	callback: proc(path: string, data: rawptr),
+	data: rawptr = nil,
+) {
 	path_to_search := fmt.tprint(dir_path, "*", sep = "\\")
-	wpath_to_search := _tprint_string_as_wstring(path_to_search)
+	wpath_to_search := tprint_string_as_wstring(path_to_search)
 	find_result: WIN32_FIND_DATAW
 	find := FindFirstFileW(wpath_to_search, &find_result)
 	if find != FindFile(INVALID_HANDLE) {
 		for {
 			relative_wpath := &find_result.cFileName[0]
-			relative_path := _tprint_wstring(relative_wpath)
+			relative_path := tprint_wstring(relative_wpath)
 			assert(relative_path != "")
 			if relative_path != "." && relative_path != ".." {
 				is_dir :=
@@ -164,9 +183,9 @@ walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr),
 		FindClose(find)
 	}
 }
-read_entire_file :: proc(file_path: string) -> (text: string, ok: bool) {
+read_file :: proc(file_path: string) -> (text: string, ok: bool) {
 	file := CreateFileW(
-		_tprint_string_as_wstring(file_path),
+		tprint_string_as_wstring(file_path),
 		GENERIC_READ,
 		FILE_SHARE_READ,
 		nil,
@@ -189,10 +208,20 @@ read_entire_file :: proc(file_path: string) -> (text: string, ok: bool) {
 	}
 	return
 }
+write_file_atomically :: proc(file_path, text: string) {
+	// write to temp file
+	temp_file_path := fmt.tprintf("%v.tmp", file_path)
+	temp_file, ok := open_file_for_writing_and_truncate(temp_file_path)
+	assert(ok)
+	write_to_file(temp_file, text)
+	close_file(temp_file)
+	// move temp file to file_path
+	move_path_atomically(temp_file_path, file_path)
+}
 open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHandle, ok: bool) {
 	file = FileHandle(
 		CreateFileW(
-			_tprint_string_as_wstring(file_path),
+			tprint_string_as_wstring(file_path),
 			GENERIC_WRITE,
 			FILE_SHARE_READ,
 			nil,
@@ -204,7 +233,7 @@ open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHand
 	ok = file != FileHandle(INVALID_HANDLE)
 	return
 }
-write :: proc(file: FileHandle, text: string) {
+write_to_file :: proc(file: FileHandle, text: string) {
 	assert(len(text) < int(max(u32)))
 	bytes_written: DWORD
 	WriteFile(file, raw_data(text), u32(len(text)), &bytes_written, nil)

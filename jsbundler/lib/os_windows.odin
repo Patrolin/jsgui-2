@@ -43,8 +43,8 @@ ULONG :: u32
 LONGLONG :: i64
 ULONGLONG :: u64
 
-INT :: i32
-UINT :: u32
+CINT :: i32
+CUINT :: u32
 /* -c types */
 LARGE_INTEGER :: LONGLONG
 
@@ -77,8 +77,8 @@ foreign import kernel32 "system:Kernel32.lib"
 @(default_calling_convention = "c")
 foreign kernel32 {
 	// common procs
-	WideCharToMultiByte :: proc(CodePage: UINT, dwFlags: DWORD, lpWideCharStr: CWSTR, cchWideChar: INT, lpMultiByteStr: CSTR, cbMultiByte: INT, lpDefaultChar: CSTR, lpUsedDefaultChar: ^BOOL) -> INT ---
-	MultiByteToWideChar :: proc(CodePage: UINT, dwFlags: DWORD, lpMultiByteStr: CSTR, cbMultiByte: INT, lpWideCharStr: CWSTR, cchWideChar: INT) -> INT ---
+	WideCharToMultiByte :: proc(CodePage: CUINT, dwFlags: DWORD, lpWideCharStr: CWSTR, cchWideChar: CINT, lpMultiByteStr: CSTR, cbMultiByte: CINT, lpDefaultChar: CSTR, lpUsedDefaultChar: ^BOOL) -> CINT ---
+	MultiByteToWideChar :: proc(CodePage: CUINT, dwFlags: DWORD, lpMultiByteStr: CSTR, cbMultiByte: CINT, lpWideCharStr: CWSTR, cchWideChar: CINT) -> CINT ---
 	GetLastError :: proc() -> DWORD ---
 	CreateEventW :: proc(attributes: ^SECURITY_ATTRIBUTES, manual_reset: BOOL, initial_state: BOOL, name: CWSTR) -> HANDLE ---
 	ResetEvent :: proc(handle: HANDLE) -> BOOL ---
@@ -87,7 +87,7 @@ foreign kernel32 {
 	CloseHandle :: proc(handle: HANDLE) -> BOOL ---
 	// process procs
 	GetCommandLineW :: proc() -> CWSTR ---
-	ExitProcess :: proc(uExitCode: UINT) ---
+	ExitProcess :: proc(uExitCode: CUINT) ---
 	// IOCP procs
 	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	GetQueuedCompletionStatus :: proc(iocp: HANDLE, bytes_transferred: ^DWORD, user_ptr: ^rawptr, overlapped: ^^OVERLAPPED, millis: DWORD) -> BOOL ---
@@ -98,7 +98,7 @@ foreign kernel32 {
 
 // helper procs
 @(private = "file")
-_tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocator) -> string {
+tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocator) -> string {
 	wlen_i32 := i32(wlen)
 	assert(int(wlen_i32) == wlen)
 
@@ -134,14 +134,14 @@ _tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_alloca
 	return transmute(string)(str_buf[:str_len])
 }
 @(private = "file")
-_tprint_string16 :: proc(wstr: string16, allocator := context.temp_allocator) -> string {
-	return _tprint_cwstr(raw_data(wstr), len(wstr), allocator = allocator)
+tprint_string16 :: proc(wstr: string16, allocator := context.temp_allocator) -> string {
+	return tprint_cwstr(raw_data(wstr), len(wstr), allocator = allocator)
 }
-_tprint_wstring :: proc {
-	_tprint_cwstr,
-	_tprint_string16,
+tprint_wstring :: proc {
+	tprint_cwstr,
+	tprint_string16,
 }
-_tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator) -> CWSTR {
+tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator) -> CWSTR {
 	str_len := len(str)
 	str_len_i32 := i32(str_len)
 	assert(int(str_len_i32) == str_len)
@@ -164,6 +164,8 @@ _tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocat
 }
 
 // path constants
+MOVEFILE_REPLACE_EXISTING :: 1
+
 FILE_LIST_DIRECTORY: DWORD : 0x00000001
 
 GENERIC_READ: DWORD : 0x80000000
@@ -200,33 +202,10 @@ FILE_NOTIFY_CHANGE_LAST_ACCESS :: 0x00000020
 FILE_NOTIFY_CHANGE_CREATION :: 0x00000040
 FILE_NOTIFY_CHANGE_SECURITY :: 0x00000100
 
+ERROR_PATH_NOT_FOUND :: 3
+
 /* NOTE: *NOT* the max path on windows anymore, but half the apis don't support paths above this... */
 MAX_PATH :: 260
-
-// file types
-FileHandle :: distinct HANDLE
-/*
-FILETIME :: struct #align (4) {
-	value: u64le,
-}
-*/
-FILETIME :: struct {
-	dwLowDateTime:  DWORD,
-	dwHighDateTime: DWORD,
-}
-SECURITY_DESCRIPTOR :: struct {
-	/*
-	Revision, Sbz1: BYTE,
-	Control:        SECURITY_DESCRIPTOR_CONTROL,
-	Owner, Group:   PSID,
-	Sacl, Dacl:     PACL,
-	*/
-}
-SECURITY_ATTRIBUTES :: struct {
-	nLength:              DWORD,
-	lpSecurityDescriptor: ^SECURITY_DESCRIPTOR,
-	bInheritHandle:       BOOL,
-}
 
 // dir types
 DirHandle :: distinct HANDLE
@@ -257,30 +236,58 @@ WIN32_FIND_DATAW :: struct {
 	wFinderFlags:       WORD,
 }
 
+// file types
+FileHandle :: distinct HANDLE
+/*
+FILETIME :: struct #align (4) {
+	value: u64le,
+}
+*/
+FILETIME :: struct {
+	dwLowDateTime:  DWORD,
+	dwHighDateTime: DWORD,
+}
+SECURITY_DESCRIPTOR :: struct {
+	/*
+	Revision, Sbz1: BYTE,
+	Control:        SECURITY_DESCRIPTOR_CONTROL,
+	Owner, Group:   PSID,
+	Sacl, Dacl:     PACL,
+	*/
+}
+SECURITY_ATTRIBUTES :: struct {
+	nLength:              DWORD,
+	lpSecurityDescriptor: ^SECURITY_DESCRIPTOR,
+	bInheritHandle:       BOOL,
+}
+
 // path procs
 @(default_calling_convention = "c")
 foreign kernel32 {
+	// path procs
+	MoveFileExW :: proc(src, dest: CWSTR, flags: DWORD) -> BOOL ---
+	// dir procs
+	CreateDirectoryW :: proc(path: CWSTR, attributes: ^SECURITY_ATTRIBUTES) -> BOOL ---
+	ReadDirectoryChangesW :: proc(dir: DirHandle, buffer: [^]byte, buffer_len: DWORD, subtree: BOOL, filter: DWORD, bytes_returned: ^DWORD, overlapped: ^OVERLAPPED, on_complete: ^OVERLAPPED_COMPLETION_ROUTINE) -> BOOL ---
+	FindFirstFileW :: proc(file_name: CWSTR, data: ^WIN32_FIND_DATAW) -> FindFile ---
+	FindNextFileW :: proc(find: FindFile, data: ^WIN32_FIND_DATAW) -> BOOL ---
+	FindClose :: proc(find: FindFile) -> BOOL ---
 	// file procs
 	CreateFileW :: proc(lpFileName: CWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: ^SECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: HANDLE) -> HANDLE ---
 	GetFileSizeEx :: proc(file: FileHandle, file_size: ^LARGE_INTEGER) -> BOOL ---
 	ReadFile :: proc(file: FileHandle, buffer: [^]byte, bytes_to_read: DWORD, bytes_read: ^DWORD, overlapped: ^OVERLAPPED) -> BOOL ---
 	WriteFile :: proc(file: FileHandle, buffer: [^]byte, bytes_to_write: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED) -> BOOL ---
 	FlushFileBuffers :: proc(file: FileHandle) -> BOOL ---
-	// dir procs
-	ReadDirectoryChangesW :: proc(dir: DirHandle, buffer: [^]byte, buffer_len: DWORD, subtree: BOOL, filter: DWORD, bytes_returned: ^DWORD, overlapped: ^OVERLAPPED, on_complete: ^OVERLAPPED_COMPLETION_ROUTINE) -> BOOL ---
-	FindFirstFileW :: proc(file_name: CWSTR, data: ^WIN32_FIND_DATAW) -> FindFile ---
-	FindNextFileW :: proc(find: FindFile, data: ^WIN32_FIND_DATAW) -> BOOL ---
-	FindClose :: proc(find: FindFile) -> BOOL ---
 }
 
 // socket constants
 WSADESCRIPTION_LEN :: 256
 WSASYS_STATUS_LEN :: 128
-SOMAXCONN :: max(INT)
+SOMAXCONN :: max(CINT)
 INVALID_SOCKET :: max(SOCKET)
 
-SOL_SOCKET :: INT(max(u16))
-SO_UPDATE_ACCEPT_CONTEXT: INT : 0x700B
+SOL_SOCKET :: CINT(max(u16))
+SO_UPDATE_ACCEPT_CONTEXT: CINT : 0x700B
 
 ERROR_CONNECTION_ABORTED :: 1236
 ERROR_OPERATION_ABORTED :: 995
@@ -352,7 +359,7 @@ TRANSMIT_FILE_BUFFERS :: struct {
 	tail_length: DWORD,
 }
 /* TODO */
-Winsock_GROUP :: distinct UINT
+Winsock_GROUP :: distinct CUINT
 /* TODO */
 WSAPROTOCOL_INFOW :: struct {}
 
@@ -361,16 +368,16 @@ WSAPROTOCOL_INFOW :: struct {}
 foreign import winsock_lib "system:Ws2_32.lib"
 @(default_calling_convention = "c")
 foreign winsock_lib {
-	WSAStartup :: proc(requested_version: WORD, winsock: ^WinsockData) -> INT ---
-	WSAIoctl :: proc(socket: SOCKET, control_code: DWORD, in_buf: rawptr, in_len: DWORD, out_buf: rawptr, out_len: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> INT ---
-	WSASocketW :: proc(address_type, connection_type, protocol: INT, protocol_info: ^WSAPROTOCOL_INFOW, group: Winsock_GROUP, flags: DWORD) -> SOCKET ---
-	WSARecv :: proc(socket: SOCKET, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> INT ---
+	WSAStartup :: proc(requested_version: WORD, winsock: ^WinsockData) -> CINT ---
+	WSAIoctl :: proc(socket: SOCKET, control_code: DWORD, in_buf: rawptr, in_len: DWORD, out_buf: rawptr, out_len: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
+	WSASocketW :: proc(address_type, connection_type, protocol: CINT, protocol_info: ^WSAPROTOCOL_INFOW, group: Winsock_GROUP, flags: DWORD) -> SOCKET ---
+	WSARecv :: proc(socket: SOCKET, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
 
-	socket :: proc(address_type, connection_type, protocol: INT) -> SOCKET ---
-	bind :: proc(socket: SOCKET, address: ^SocketAddress, address_size: INT) -> INT ---
-	listen :: proc(socket: SOCKET, max_connections: INT) -> INT ---
-	closesocket :: proc(socket: SOCKET) -> INT ---
-	setsockopt :: proc(socket: SOCKET, level: INT, optname: INT, optval: rawptr, optlen: INT) -> INT ---
+	socket :: proc(address_type, connection_type, protocol: CINT) -> SOCKET ---
+	bind :: proc(socket: SOCKET, address: ^SocketAddress, address_size: CINT) -> CINT ---
+	listen :: proc(socket: SOCKET, max_connections: CINT) -> CINT ---
+	closesocket :: proc(socket: SOCKET) -> CINT ---
+	setsockopt :: proc(socket: SOCKET, level: CINT, optname: CINT, optval: rawptr, optlen: CINT) -> CINT ---
 
 	WSAGetLastError :: proc() -> DWORD ---
 }
