@@ -160,11 +160,76 @@ export function getElement(parent, tagName, props = {}) {
  * @param {string} key
  * @param {T} defaultState
  * @returns {T} */
-export function useState(parent, key, defaultState) {
-  if (key == null || key === "") throw "key is required in useState()";
+export function useState(parent, key = "", defaultState) {
   const info = _getChildInfo(parent, `useState(${key})`, undefined, /** @type {any} */(defaultState));
   const { state } = info;
   return state;
+}
+/**
+ * @template T
+ * @typedef {Object} UseMemoProps
+ * @property {string} [key] - required if you want to call this in arbitrary order, else same rules as React
+ * @property {() => T} value
+ * @property {any[]} [dependOn]
+ */
+/**
+ * @template T
+ * @param {Component} parent
+ * @param {UseMemoProps<T>} props
+ * @returns {T} */
+export function useMemo(parent, props) {
+  const {key, value, dependOn = []} = props;
+  const info = _getChildInfo(parent, `useMemo(${key})`, undefined, {});
+  const { state } = info;
+  const {prevDependOn = []} = state;
+  if (prevDependOn.length !== dependOn.length || dependOn.some((v, i) => v !== prevDependOn[i])) {
+    state.value = value();
+    state.prevDependOn = dependOn;
+  }
+  return state.value;
+}
+/**
+ * @template T
+ * @typedef {Object} UseGetRequestProps
+ * @property {string} [key] - required if you want to call this in arbitrary order, else same rules as React
+ * @property {NoInfer<T>} [defaultValue]
+ * @property {() => Promise<T>} fetch
+ * @property {(errorOrResponse: any) => void} [onError]
+ * @property {any} [refetchOn]
+ */
+/**
+ * @template T
+ * @param {Component} parent
+ * @param {UseGetRequestProps<T>} props
+ * @returns {[boolean, T, () => void, boolean]} */
+export function useGetRequest(parent, props) {
+  const {key = "", fetch, onError, refetchOn} = props;
+  let defaultValue;
+  if (!("defaultValue" in props)) defaultValue = [];
+  else {defaultValue = props.defaultValue};
+  const state = useState(parent, `useGetRequest.${key}`, {
+    prevRefetchOn: /** @type {string | null} */(null),
+    loading: true,
+    value: /** @type {T} */(defaultValue),
+  });
+  const refetch = () => {
+    if (state.loading === false) {
+      state.loading = true;
+      rerender();
+    }
+    Promise.try(fetch).then((response) => {
+      state.value = response;
+      state.loading = false;
+      rerender();
+    }).catch(onError);
+  }
+  const isInitialLoad = state.prevRefetchOn === null;
+  const refetchOn_string = JSON.stringify(refetchOn);
+  if (refetchOn_string !== state.prevRefetchOn) {
+    state.prevRefetchOn = refetchOn_string;
+    refetch();
+  }
+  return [state.loading, state.value, refetch, isInitialLoad];
 }
 
 // components
@@ -174,6 +239,27 @@ export function useState(parent, key, defaultState) {
  * @returns {Component} */
 export function div(parent, props) {
   return getElement(parent, "div", props);
+}
+/**
+ * @param {Component} parent
+ * @param {HTMLProps} [props]
+ * @returns {Component} */
+export function ul(parent, props) {
+  return getElement(parent, "ul", props);
+}
+/**
+ * @param {Component} parent
+ * @param {HTMLProps} [props]
+ * @returns {Component} */
+export function ol(parent, props) {
+  return getElement(parent, "ol", props);
+}
+/**
+ * @param {Component} parent
+ * @param {HTMLProps} [props]
+ * @returns {Component} */
+export function li(parent, props) {
+  return getElement(parent, "li", props);
 }
 /**
  * @param {Component} parent

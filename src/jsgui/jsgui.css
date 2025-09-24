@@ -33,6 +33,18 @@ body {
   color: #f0f0f0;
   font-family: Roboto, Arial, sans-serif;
 }
+ul, ol {
+  display: block;
+  padding-inline-start: 32px;
+  list-style: square;
+}
+li {
+  display: list-item;
+  overflow: unset;
+}
+li > * {
+  vertical-align: bottom;
+}
 
 /* font-size */
 h1 {
