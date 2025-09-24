@@ -118,12 +118,12 @@ button:active {
 [flex="x-scroll"] {
   justify-content: flex-start;
   align-items: stretch;
-  overflow-x: scroll;
+  overflow-x: auto;
 }
 [flex="y-scroll"] {
   justify-content: flex-start;
   align-items: stretch;
-  overflow-y: scroll;
+  overflow-y: auto;
 }
 [flex-align="center"] {
   align-items: center;
