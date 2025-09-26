@@ -1,6 +1,5 @@
 package main
 import "core:fmt"
-import "core:strings"
 import "lib"
 
 // constants
@@ -25,9 +24,9 @@ serve_http_proc :: proc(data: rawptr) {
 		if client.state == .Reading {
 			request := transmute(string)(client.async_rw_buffer[:client.async_rw_pos])
 			if len(request) < len(GET_START) {continue}
-			if !strings.starts_with(request, GET_START) {
+			if !lib.starts_with(request, GET_START) {
 				lib.cancel_io_and_close_client(client)
-			} else if strings.ends_with(request, HTTP_END) {
+			} else if lib.ends_with(request, HTTP_END) {
 				// TODO: handle favicons or whatever?
 				file_path := "index.html"
 				file, file_size, ok := lib.open_file_for_response(client, file_path)

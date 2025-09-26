@@ -1,11 +1,10 @@
 // odin run jsbundler
-// odin build jsbundler -o:speed
+// odin build jsbundler -default-to-nil-allocator -o:speed
 /* NOTE: odin adds 250 KiB to exe size, just for RTTI - we need a better language? */
 package main
 import "core:fmt"
 import "core:mem"
 import "core:strconv"
-import "core:strings"
 import "core:text/regex"
 import "core:thread" // NOTE: this adds 19 KiB to the exe size
 import "lib"
@@ -121,7 +120,7 @@ rebuild_index_file :: proc() {
 	walk_data: WalkData
 	walk_proc :: proc(next_path: string, user_data: rawptr) {
 		walk_data := (^WalkData)(user_data)
-		extension_index := strings.last_index_byte(next_path, '.')
+		extension_index := lib.last_index_ascii(next_path, '.')
 		extension := next_path[extension_index:]
 		if extension == ".js" || extension == ".mjs" {
 			file_text, ok := lib.read_file(next_path)

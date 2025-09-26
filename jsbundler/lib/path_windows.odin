@@ -2,7 +2,6 @@ package lib
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
-import "core:strings"
 import "core:time"
 
 // constants
@@ -199,7 +198,7 @@ read_file :: proc(file_path: string) -> (text: string, ok: bool) {
 		fmt.printfln("err: (%v)", GetLastError())
 	}
 	if ok {
-		sb := strings.builder_make_none()
+		sb: StringBuilder
 		buffer: [4096]u8 = ---
 		bytes_read: u32
 		for {
@@ -208,7 +207,7 @@ read_file :: proc(file_path: string) -> (text: string, ok: bool) {
 			fmt.sbprint(&sb, transmute(string)(buffer[:bytes_read]))
 		}
 		CloseHandle(file)
-		text = strings.to_string(sb)
+		text = to_string(sb)
 	}
 	return
 }
