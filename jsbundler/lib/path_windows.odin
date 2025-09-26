@@ -2,7 +2,7 @@ package lib
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
-import "core:time"
+import "core:time" // TODO: don't use core:time
 
 // constants
 ERROR_IO_INCOMPLETE :: 996

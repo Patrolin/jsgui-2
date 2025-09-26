@@ -6,7 +6,7 @@ import "core:fmt"
 import "core:mem"
 import "core:strconv"
 import "core:text/regex"
-import "core:thread" // NOTE: this adds 19 KiB to the exe size
+import "core:thread" // NOTE: this adds 19 KiB to the exe size, TODO: don't use core:thread
 import "lib"
 
 // globals
@@ -146,6 +146,7 @@ rebuild_index_file :: proc() {
 		for i < len(js_text) && (js_text[i] == '\r' || js_text[i] == '\n') {
 			i += 1
 		}
+		// TODO: replace this with index_multi()?
 		ignore_regex := "/\\*\\*.*?\\*/|import .*? from .*?[\n$]|export "
 		iterator, err := regex.create_iterator(js_text, ignore_regex, {.Multiline})
 		assert(err == nil)
