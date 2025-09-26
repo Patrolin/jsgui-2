@@ -15,7 +15,7 @@ serve_port: u16 = 3000
 serve_thread_count := 1
 
 // constants
-SRC_PATH :: "src" /* NOTE: FILES_TO_INIT need hardcoded paths.. */
+SRC_PATH :: "src" /* NOTE: FILES_TO_INIT needs hardcoded paths.. */
 JSGUI_VERSION :: #load("../src/jsgui/jsgui_version.txt", string)
 FileToInit :: struct {
 	path: string,
