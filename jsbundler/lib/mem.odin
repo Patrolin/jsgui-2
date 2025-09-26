@@ -48,35 +48,34 @@ release_lock :: #force_inline proc "contextless" (lock: ^Lock) {
 }
 
 // copy procedures
-copy_slow :: proc(src: rawptr, size: int, dest: rawptr) {
-	dest := uintptr(dest)
-	dest_end := dest + transmute(uintptr)(size)
-	src := uintptr(src)
+zero :: proc(to: []byte) {
+	dest := uintptr(raw_data(to))
+	dest_end := dest + uintptr(len(to))
+	dest_end_64B := dest_end - 63
+	zero_src := (#simd[64]byte)(0)
+	for dest < dest_end_64B {
+		(^#simd[64]byte)(dest)^ = zero_src
+		dest += 64
+	}
+	for dest < dest_end {
+		(^byte)(dest)^ = 0
+		dest += 1
+	}
+}
+copy :: proc(from, to: []byte) {
+	src := uintptr(raw_data(from))
+	dest := uintptr(raw_data(to))
+	dest_end := dest + uintptr(min(len(from), len(to)))
+	dest_end_64B := dest_end - 63
+	for dest < dest_end_64B {
+		(^#simd[64]byte)(dest)^ = (^#simd[64]byte)(src)^
+		dest += 64
+		src += 64
+	}
 	for dest < dest_end {
 		(^byte)(dest)^ = (^byte)(src)^
 		dest += 1
 		src += 1
-	}
-}
-zero_simd_64B :: proc(dest: rawptr, size: int) {
-	dest := uintptr(dest)
-	dest_end := dest + transmute(uintptr)(size)
-
-	zero := (#simd[64]byte)(0)
-	for dest < dest_end {
-		(^#simd[64]byte)(dest)^ = zero
-		dest += 64
-	}
-}
-copy_simd_64B :: proc(src: rawptr, size: int, dest: rawptr) {
-	dest := uintptr(dest)
-	dest_end := dest + transmute(uintptr)(size)
-	src := uintptr(src)
-
-	for dest < dest_end {
-		(^#simd[64]byte)(dest)^ = (^#simd[64]byte)(src)^
-		dest += 64
-		src += 64
 	}
 }
 
@@ -110,6 +109,7 @@ arena_allocator_proc :: proc(
 		ptr := _arena_alloc(arena_allocator, size)
 		data = ptr[:size]
 		err = arena_allocator.next > len(arena_allocator.buffer) ? .Out_Of_Memory : .None
+		if mode == .Alloc {zero(data)}
 	case .Resize, .Resize_Non_Zeroed:
 		// alloc
 		ptr := _arena_alloc(arena_allocator, size)
@@ -119,8 +119,9 @@ arena_allocator_proc :: proc(
 			break
 		}
 		// copy
-		size_to_copy := min(size, old_size)
-		copy_simd_64B(old_ptr, size_to_copy, ptr)
+		old_data := ([^]byte)(old_ptr)[:old_size]
+		if mode == .Resize {zero(data)}
+		copy(old_data, data)
 	case .Free_All:
 		arena_allocator.next = 0
 	}

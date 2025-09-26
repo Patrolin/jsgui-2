@@ -160,10 +160,7 @@ open_file_for_response :: proc(
 	file_size: int,
 	ok: bool,
 ) {
-	client.async_write_file_path = tprint_string_as_wstring(
-		file_path,
-		allocator = context.allocator,
-	)
+	client.async_write_file_path = &tprint_string_as_wstring(file_path, allocator = context.allocator)[0]
 	file = FileHandle(
 		CreateFileW(
 			client.async_write_file_path,
@@ -200,7 +197,7 @@ send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte
 		"len(header) must be < len(client.async_rw_buffer), got: %v",
 		len(header),
 	)
-	copy_slow(raw_data(header), len(header), &client.async_rw_buffer)
+	copy(header, client.async_rw_buffer[:])
 
 	client.async_rw_prev_pos = 0
 	client.async_rw_pos = 0

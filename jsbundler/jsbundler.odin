@@ -50,13 +50,18 @@ main :: proc() {
 	when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 		lib.init_page_fault_handler()
 		shared_buffer := lib.page_reserve(lib.GibiByte)
-		half_fit: lib.HalfFitAllocator
-		shared_allocator = lib.half_fit_allocator(&half_fit, shared_buffer)
+		when false {
+			half_fit: lib.HalfFitAllocator
+			shared_allocator = lib.half_fit_allocator(&half_fit, shared_buffer)
+		} else {
+			shared_arena: lib.ArenaAllocator
+			shared_allocator = lib.arena_allocator(&shared_arena, shared_buffer)
+		}
 		context.allocator = shared_allocator
 
 		temp_buffer := lib.page_reserve(lib.GibiByte)
-		arena_allocator: lib.ArenaAllocator
-		context.temp_allocator = lib.arena_allocator(&arena_allocator, temp_buffer)
+		temp_arena_allocator: lib.ArenaAllocator
+		context.temp_allocator = lib.arena_allocator(&temp_arena_allocator, temp_buffer)
 	}
 
 	args := lib.get_args()

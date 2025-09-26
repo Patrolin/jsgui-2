@@ -91,9 +91,7 @@ half_fit_allocator_proc :: proc(
 	case .Alloc, .Alloc_Non_Zeroed:
 		data, err = half_fit_alloc(half_fit, size)
 		ptr := raw_data(data)
-		if mode == .Alloc {
-			zero_simd_64B(ptr, len(data))
-		}
+		if mode == .Alloc {zero(data)}
 		assert((uintptr(ptr) & 63) == 0, loc = loc)
 	case .Free:
 		assert((uintptr(old_ptr) & 63) == 0, loc = loc)
@@ -104,19 +102,10 @@ half_fit_allocator_proc :: proc(
 		// free // NOTE: free after alloc, so we can do a non-overlapped copy
 		assert((uintptr(old_ptr) & 63) == 0, loc = loc)
 		half_fit_free(half_fit, old_ptr, loc)
-		// zero
-		ptr := raw_data(data)
-		if mode == .Resize {
-			if size > old_size {
-				align_backward := align_backward(ptr, 64)
-				offset := old_size - align_backward
-				zero_start := ptr_add(ptr, offset)
-				zero_simd_64B(zero_start, size - offset)
-			}
-		}
 		// copy
-		size_to_copy := min(size, old_size)
-		copy_simd_64B(old_ptr, size_to_copy, ptr)
+		old_data := ([^]byte)(old_ptr)[:old_size]
+		if mode == .Resize {zero(data)}
+		copy(old_data, data)
 	case:
 		data, err = nil, .Mode_Not_Implemented
 	}

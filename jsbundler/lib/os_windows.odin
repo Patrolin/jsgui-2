@@ -173,7 +173,7 @@ tprint_wstring :: proc {
 	tprint_cwstr,
 	tprint_string16,
 }
-tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator) -> CWSTR {
+tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator) -> []u16 {
 	str_len := len(str)
 	str_len_cint := CINT(str_len)
 	assert(int(str_len_cint) == str_len)
@@ -192,7 +192,7 @@ tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocato
 		cwlen,
 	)
 	assert(written_chars == wlen)
-	return &cwstr_buf[0]
+	return cwstr_buf[:cwlen]
 }
 
 // path constants

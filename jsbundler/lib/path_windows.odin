@@ -20,8 +20,8 @@ WatchedDir :: struct {
 // path procs
 move_path_atomically :: proc(src_path, dest_path: string) {
 	result := MoveFileExW(
-		tprint_string_as_wstring(src_path),
-		tprint_string_as_wstring(dest_path),
+		&tprint_string_as_wstring(src_path)[0],
+		&tprint_string_as_wstring(dest_path)[0],
 		MOVEFILE_REPLACE_EXISTING,
 	)
 	fmt.assertf(bool(result), "Failed to move path: '%v' to '%v'", src_path, dest_path)
@@ -29,7 +29,7 @@ move_path_atomically :: proc(src_path, dest_path: string) {
 
 // dir procs
 create_dir_if_not_exists :: proc(dir_path: string) -> (ok: bool) {
-	CreateDirectoryW(tprint_string_as_wstring(dir_path), nil)
+	CreateDirectoryW(&tprint_string_as_wstring(dir_path)[0], nil)
 	err := GetLastError()
 	return err != ERROR_PATH_NOT_FOUND
 }
@@ -38,7 +38,7 @@ open_dir_for_watching :: proc(dir_path: string) -> (dir: WatchedDir) {
 	dir.path = dir_path
 	dir.handle = DirHandle(
 		CreateFileW(
-			tprint_string_as_wstring(dir_path),
+			&tprint_string_as_wstring(dir_path)[0],
 			FILE_LIST_DIRECTORY,
 			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 			nil,
@@ -85,7 +85,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 
 			// wait for file_size to change..
 			file := CreateFileW(
-				wfile_path,
+				&wfile_path[0],
 				GENERIC_READ,
 				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
 				nil,
@@ -161,7 +161,7 @@ walk_files :: proc(
 	path_to_search := fmt.tprint(dir_path, "*", sep = "\\")
 	wpath_to_search := tprint_string_as_wstring(path_to_search)
 	find_result: WIN32_FIND_DATAW
-	find := FindFirstFileW(wpath_to_search, &find_result)
+	find := FindFirstFileW(&wpath_to_search[0], &find_result)
 	if find != FindFile(INVALID_HANDLE) {
 		for {
 			relative_wpath := &find_result.cFileName[0]
@@ -184,13 +184,14 @@ walk_files :: proc(
 	}
 }
 read_file :: proc(file_path: string) -> (text: string, ok: bool) {
+	wfile_path := tprint_string_as_wstring(file_path)
 	file := CreateFileW(
-		tprint_string_as_wstring(file_path),
+		&wfile_path[0],
 		GENERIC_READ,
 		FILE_SHARE_READ | FILE_SHARE_WRITE,
 		nil,
 		F_OPEN,
-		0,
+		FILE_ATTRIBUTE_NORMAL,
 		nil,
 	)
 	ok = file != INVALID_HANDLE
@@ -224,7 +225,7 @@ write_file_atomically :: proc(file_path, text: string) {
 open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHandle, ok: bool) {
 	file = FileHandle(
 		CreateFileW(
-			tprint_string_as_wstring(file_path),
+			&tprint_string_as_wstring(file_path)[0],
 			GENERIC_WRITE,
 			FILE_SHARE_READ,
 			nil,
