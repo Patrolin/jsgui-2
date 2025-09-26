@@ -1,9 +1,6 @@
 package lib
 import "base:intrinsics"
 import "core:fmt"
-import "core:mem"
-import "core:strings"
-import "core:time"
 
 // params
 WINSOCK_MAJOR_VERSION :: 2
@@ -203,7 +200,7 @@ send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte
 		"len(header) must be < len(client.async_rw_buffer), got: %v",
 		len(header),
 	)
-	mem.copy(&client.async_rw_buffer, raw_data(header), len(header))
+	copy_slow(raw_data(header), len(header), &client.async_rw_buffer)
 
 	client.async_rw_prev_pos = 0
 	client.async_rw_pos = 0

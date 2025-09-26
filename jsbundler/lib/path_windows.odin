@@ -194,6 +194,9 @@ read_file :: proc(file_path: string) -> (text: string, ok: bool) {
 		nil,
 	)
 	ok = file != INVALID_HANDLE
+	if !ok {
+		fmt.printfln("err: (%v)", GetLastError())
+	}
 	if ok {
 		sb := strings.builder_make_none()
 		buffer: [4096]u8 = ---

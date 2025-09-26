@@ -36,26 +36,42 @@ body {
   color: #f0f0f0;
   font-family: Roboto, Arial, sans-serif;
 }
+ul, ol {
+  display: block;
+  padding-inline-start: 32px;
+  list-style: square;
+}
+li {
+  display: list-item;
+  overflow: unset;
+}
+li > * {
+  vertical-align: middle;
+}
 
 /* font-size */
 h1 {
-  --font-size: 20px;
+  font-size: 20px;
+  --line-height: 28px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 700;
 }
 h2 {
-  --font-size: 16px;
+  font-size: 16px;
+  --line-height: 22px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 500;
 }
 body, h3 {
-  --font-size: 14px;
+  font-size: 14px;
+  --line-height: 20px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 400;
 }
 h4, h5, h6 {
-  --font-size: 12px;
+  font-size: 12px;
+  --line-height: 16px; /* NOTE: round_to_multiple_of_2(1.4 * font-size) */
   font-weight: 400;
 }
 h1, h2, h3, h4, h5, h6, span, a {
-  line-height: round(down, calc(var(--fontSize) * 1.4));
+  line-height: var(--line-height);
 }
 
 /* svg */
@@ -121,12 +137,12 @@ button:active {
 [flex="x-scroll"] {
   justify-content: flex-start;
   align-items: stretch;
-  overflow-x: scroll;
+  overflow-x: auto;
 }
 [flex="y-scroll"] {
   justify-content: flex-start;
   align-items: stretch;
-  overflow-y: scroll;
+  overflow-y: auto;
 }
 [flex-align="center"] {
   align-items: center;
@@ -189,8 +205,11 @@ function headerRight(header) {
   div(header);
 }
 function App(body) {
-  const state = useState(body, "App", {
-    lineCount: 2,
+  const state = useState(body, {
+    key: "App",
+    value: {
+      lineCount: 2,
+    },
   });
 
   const header = div(body, { width: "100%", height: 56, padding: "0 16px", attributes: {flex: "x-justify"} });
@@ -406,7 +425,7 @@ function _getChildInfo(parent, key, tagName, defaultState = {}) {
 }
 function _appendOrMoveElement(parent, info) {
   const element = info.element;
-  if (element == null) return; // NOTE: things like useState() store data, but have no element
+  if (element == null) return; /* NOTE: things like useState() store data, but have no element */
 
   info._nextChild = (element.firstElementChild);
   if (element === parent._nextChild) {
@@ -424,25 +443,77 @@ function getElement(parent, tagName, props = {}) {
 }
 
 // hooks
-function useState(parent, key, defaultState) {
-  if (key == null || key === "") throw "key is required in useState()";
-  const info = _getChildInfo(parent, `useState(${key})`, undefined, (defaultState));
+function useState(parent, props) {
+  const {key = "", value} = props;
+  const info = _getChildInfo(parent, `useState(${key})`, undefined, (value));
   const { state } = info;
   return state;
+}
+function useMemo(parent, props) {
+  const {key, value, dependOn = []} = props;
+  const info = _getChildInfo(parent, `useMemo(${key})`, undefined, {});
+  const { state } = info;
+  const {prevDependOn = []} = state;
+  if (prevDependOn.length !== dependOn.length || dependOn.some((v, i) => v !== prevDependOn[i])) {
+    state.value = value();
+    state.prevDependOn = dependOn;
+  }
+  return state.value;
+}
+function useGetRequest(parent, props) {
+  const {key = "", fetch, onError, refetchOn} = props;
+  let defaultValue;
+  if (!("defaultValue" in props)) defaultValue = [];
+  else {defaultValue = props.defaultValue};
+  const state = useState(parent, {
+    key: `useGetRequest.${key}`,
+    value: {
+      prevRefetchOn: (null),
+      loading: true,
+      value: (defaultValue),
+    },
+  });
+  const refetch = () => {
+    if (state.loading === false) {
+      state.loading = true;
+      rerender();
+    }
+    Promise.try(fetch).then((response) => {
+      state.value = response;
+      state.loading = false;
+      rerender();
+    }).catch(onError);
+  }
+  const isInitialLoad = state.prevRefetchOn === null;
+  const refetchOn_string = JSON.stringify(refetchOn);
+  if (refetchOn_string !== state.prevRefetchOn) {
+    state.prevRefetchOn = refetchOn_string;
+    refetch();
+  }
+  return [state.loading, state.value, refetch, isInitialLoad];
 }
 
 // components
 function div(parent, props) {
   return getElement(parent, "div", props);
 }
+function ul(parent, props) {
+  return getElement(parent, "ul", props);
+}
+function ol(parent, props) {
+  return getElement(parent, "ol", props);
+}
+function li(parent, props) {
+  return getElement(parent, "li", props);
+}
 function span(parent, text, props) {
   const info = getElement(parent, "span", props);
-  info.element.textContent = (text);
+  info.element.textContent = (text); /* NOTE: this overwrites all child nodes */
   return info;
 }
 function link(parent, text, props) {
   const info = getElement(parent, "a", props);
-  info.element.textContent = (text);
+  if (text) span(info, text); /* NOTE: don't overwrite child nodes */
   return info;
 }
 function svg(parent, props, innerHTML) {
@@ -641,12 +712,14 @@ function webgl(parent, props, webglProps) {
   const info = getElement(parent, "canvas", props);
   const node = (info.element);
   // TODO: type check the state
-  const state = useState(info, "webgl", ({
-    gl: null,
-    programs: null,
-    rect: new DOMRect(),
-    didCompile: false,
-  }));
+  const state = useState(info, {
+    value: ({
+      gl: null,
+      programs: null,
+      rect: new DOMRect(),
+      didCompile: false,
+    }),
+  });
   if (state.gl == null) {
     const gl = node.getContext("webgl2");
     if (!gl) return;

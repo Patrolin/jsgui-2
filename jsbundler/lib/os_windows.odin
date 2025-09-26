@@ -24,6 +24,18 @@ WT_EXECUTEONLYONCE :: 0x8
 TF_DISCONNECT :: 0x1
 TF_REUSE_SOCKET :: 0x2
 
+MEM_COMMIT: DWORD : 0x00001000
+MEM_RESERVE: DWORD : 0x00002000
+MEM_DECOMMIT: DWORD : 0x00004000
+MEM_RELEASE: DWORD : 0x00008000
+PAGE_READWRITE: DWORD : 0x04
+
+EXCEPTION_MAXIMUM_PARAMETERS :: 15
+STATUS_ACCESS_VIOLATION: DWORD : 0xC0000005
+EXCEPTION_EXECUTE_HANDLER :: 1
+EXCEPTION_CONTINUE_SEARCH :: 0
+EXCEPTION_CONTINUE_EXECUTION :: -1
+
 // types
 ULONG_PTR :: uintptr
 HANDLE :: distinct rawptr
@@ -71,6 +83,22 @@ OVERLAPPED_COMPLETION_ROUTINE :: proc(
 	lpOverlapped: ^OVERLAPPED,
 )
 WAITORTIMERCALLBACK :: proc "std" (user_ptr: rawptr, TimerOrWaitFired: BOOL)
+EXCEPTION_RECORD :: struct {
+	ExceptionCode:        DWORD,
+	ExceptionFlags:       DWORD,
+	ExceptionRecord:      ^EXCEPTION_RECORD,
+	ExceptionAddress:     rawptr,
+	NumberParameters:     DWORD,
+	ExceptionInformation: [EXCEPTION_MAXIMUM_PARAMETERS]ULONG_PTR,
+}
+CONTEXT :: struct {
+	/* ... */
+}
+_EXCEPTION_POINTERS :: struct {
+	ExceptionRecord: ^EXCEPTION_RECORD,
+	ContextRecord:   ^CONTEXT,
+}
+TOP_LEVEL_EXCEPTION_FILTER :: proc "std" (exception: ^_EXCEPTION_POINTERS) -> LONG
 
 // Kernel32.lib procs
 foreign import kernel32 "system:Kernel32.lib"
@@ -88,6 +116,10 @@ foreign kernel32 {
 	// process procs
 	GetCommandLineW :: proc() -> CWSTR ---
 	ExitProcess :: proc(uExitCode: CUINT) ---
+	// alloc procs
+	SetUnhandledExceptionFilter :: proc(filter_callback: TOP_LEVEL_EXCEPTION_FILTER) -> TOP_LEVEL_EXCEPTION_FILTER ---
+	VirtualAlloc :: proc(address: rawptr, size: ULONG_PTR, type, protect: DWORD) -> rawptr ---
+	VirtualFree :: proc(address: rawptr, size: ULONG_PTR, type: DWORD) -> BOOL ---
 	// IOCP procs
 	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	GetQueuedCompletionStatus :: proc(iocp: HANDLE, bytes_transferred: ^DWORD, user_ptr: ^rawptr, overlapped: ^^OVERLAPPED, millis: DWORD) -> BOOL ---

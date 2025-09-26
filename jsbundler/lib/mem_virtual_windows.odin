@@ -1,0 +1,27 @@
+package lib
+
+// procedures
+init_page_fault_handler :: #force_inline proc "contextless" () {
+	SetUnhandledExceptionFilter(_page_fault_exception_handler)
+}
+_page_fault_exception_handler :: proc "std" (exception: ^_EXCEPTION_POINTERS) -> LONG {
+	if exception.ExceptionRecord.ExceptionCode == STATUS_ACCESS_VIOLATION {
+		ptr := exception.ExceptionRecord.ExceptionInformation[1]
+		page_ptr := rawptr(uintptr(ptr) & ~uintptr(PAGE_SIZE - 1))
+
+		commited_ptr := VirtualAlloc(page_ptr, 4096, MEM_COMMIT, PAGE_READWRITE)
+
+		ERROR_INVALID_ADDRESS :: 487
+		return(
+			page_ptr != nil && commited_ptr != nil ? EXCEPTION_CONTINUE_EXECUTION : EXCEPTION_EXECUTE_HANDLER \
+		)
+	}
+	return EXCEPTION_EXECUTE_HANDLER
+}
+page_reserve :: proc(size: Size) -> []byte {
+	ptr := VirtualAlloc(nil, ULONG_PTR(size), MEM_RESERVE, PAGE_READWRITE)
+	return (cast([^]byte)ptr)[:size]
+}
+page_free :: proc(ptr: rawptr) -> b32 {
+	return b32(VirtualFree(ptr, 0, MEM_RELEASE))
+}

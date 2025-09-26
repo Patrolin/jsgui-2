@@ -1,5 +1,4 @@
 package lib
-import "core:sys/linux"
 // io_uring + io_uring_prep_accept()
 
 IORing :: struct {}

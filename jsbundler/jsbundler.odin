@@ -3,6 +3,7 @@
 /* NOTE: odin adds 250 KiB to exe size, just for RTTI - we need a better language? */
 package main
 import "core:fmt"
+import "core:mem"
 import "core:strconv"
 import "core:strings"
 import "core:text/regex"
@@ -12,6 +13,7 @@ import "lib"
 // globals
 serve_http := true
 serve_port: u16 = 3000
+serve_thread_count := 1
 
 // constants
 SRC_PATH :: "src" /* NOTE: FILES_TO_INIT need hardcoded paths.. */
@@ -42,7 +44,21 @@ print_help_and_exit :: proc() {
 	fmt.println("  jsbundler init    - copy the bundled jsgui version into src/jsgui")
 	lib.exit_process()
 }
+shared_allocator: mem.Allocator
 main :: proc() {
+	// setup allocators
+	when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+		lib.init_page_fault_handler()
+		shared_buffer := lib.page_reserve(lib.GibiByte)
+		half_fit: lib.HalfFitAllocator
+		shared_allocator = lib.half_fit_allocator(&half_fit, shared_buffer)
+		context.allocator = shared_allocator
+
+		temp_buffer := lib.page_reserve(lib.GibiByte)
+		arena_allocator: lib.ArenaAllocator
+		context.temp_allocator = lib.arena_allocator(&arena_allocator, temp_buffer)
+	}
+
 	args := lib.get_args()
 	if len(args) > 1 {
 		second_arg := args[1]
@@ -74,9 +90,14 @@ main :: proc() {
 	}
 
 	dir_for_watching: lib.WatchedDir
+	server: lib.Server
 	if serve_http {
 		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
-		thread.create_and_start_with_data(&serve_port, lib.serve_http_proc, nil, nil)
+		lib.init_sockets()
+		lib.create_server_socket(&server, serve_port, serve_thread_count)
+		for i in 0 ..< serve_thread_count {
+			thread.create_and_start_with_data(&server, serve_http_proc, nil, nil)
+		}
 		dir_for_watching = lib.open_dir_for_watching(SRC_PATH)
 	}
 	for {
