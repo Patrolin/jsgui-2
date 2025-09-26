@@ -50,7 +50,7 @@ main :: proc() {
 	when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 		lib.init_page_fault_handler()
 		shared_buffer := lib.page_reserve(lib.GibiByte)
-		when false {
+		when true {
 			half_fit: lib.HalfFitAllocator
 			shared_allocator = lib.half_fit_allocator(&half_fit, shared_buffer)
 		} else {
