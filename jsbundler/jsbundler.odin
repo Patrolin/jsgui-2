@@ -146,11 +146,13 @@ rebuild_index_file :: proc() {
 		for i < len(js_text) && (js_text[i] == '\r' || js_text[i] == '\n') {
 			i += 1
 		}
-		// TODO: replace this with index_multi()?
+		// TODO: rewrite this with index_multi()
 		ignore_regex := "/\\*\\*.*?\\*/|import .*? from .*?[\n$]|export "
 		iterator, err := regex.create_iterator(js_text, ignore_regex, {.Multiline})
 		assert(err == nil)
 		match, index, ok := regex.match_iterator(&iterator)
+		index2 := lib.index_multi(js_text, "/**", "import ", "export ")
+		index3 := lib.index(js_text, "/**")
 		for ok {
 			j := match.pos[0][0]
 			if i < j {lib.write_to_file(index_file, js_text[i:j])}
