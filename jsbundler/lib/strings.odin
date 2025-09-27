@@ -19,7 +19,7 @@ ends_with :: proc(str, suffix: string) -> bool {
 	return len(str) >= len(suffix) && str[len(str) - len(suffix):] == suffix
 }
 
-/* Returns the first byte offset of the `substring` in the `str`, or `len(s)` when not found. */
+/* Returns the first byte offset of the `substring` in the `str`, or `len(str)` when not found. */
 @(private)
 hash_rabin_karp :: #force_inline proc "contextless" (hash, value: u32) -> u32 {
 	return hash * PRIME_RABIN_KARP + value
