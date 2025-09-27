@@ -22,7 +22,7 @@ Lock :: distinct bool
 ArenaAllocator :: struct {
 	buffer: []byte `fmt:"%p"`,
 	next:   int,
-	/* we will assume single threaded, this is just here to catch bugs */
+	/* NOTE: for asserting single-threaded */
 	lock:   Lock,
 }
 
@@ -31,11 +31,11 @@ mfence :: #force_inline proc "contextless" () {
 	intrinsics.atomic_thread_fence(.Seq_Cst)
 }
 @(require_results)
-get_lock_or_error :: #force_inline proc "contextless" (lock: ^Lock) -> (ok: bool) {
+get_lock :: #force_inline proc "contextless" (lock: ^Lock) -> (ok: bool) {
 	old_value := intrinsics.atomic_exchange(lock, true)
 	return old_value == false
 }
-get_lock :: #force_inline proc "contextless" (lock: ^Lock) {
+wait_for_lock :: #force_inline proc "contextless" (lock: ^Lock) {
 	for {
 		old_value := intrinsics.atomic_exchange(lock, true)
 		if intrinsics.expect(old_value == false, true) {return}
@@ -48,9 +48,9 @@ release_lock :: #force_inline proc "contextless" (lock: ^Lock) {
 }
 
 // copy procedures
-zero :: proc(to: []byte) {
-	dest := uintptr(raw_data(to))
-	dest_end := dest + uintptr(len(to))
+zero :: proc(buffer: []byte) {
+	dest := uintptr(raw_data(buffer))
+	dest_end := dest + uintptr(len(buffer))
 	dest_end_64B := dest_end - 63
 	zero_src := (#simd[64]byte)(0)
 	for dest < dest_end_64B {
@@ -100,7 +100,7 @@ arena_allocator_proc :: proc(
 
 	arena_allocator := (^ArenaAllocator)(allocator)
 	// assert single threaded
-	ok := get_lock_or_error(&arena_allocator.lock)
+	ok := get_lock(&arena_allocator.lock)
 	assert(ok, loc = loc)
 	defer release_lock(&arena_allocator.lock)
 
@@ -111,6 +111,7 @@ arena_allocator_proc :: proc(
 		err = arena_allocator.next > len(arena_allocator.buffer) ? .Out_Of_Memory : .None
 		if mode == .Alloc {zero(data)}
 	case .Resize, .Resize_Non_Zeroed:
+		// TODO: fast path if old_ptr is at the end of the used space
 		// alloc
 		ptr := _arena_alloc(arena_allocator, size)
 		data = ptr[:size]
@@ -128,12 +129,15 @@ arena_allocator_proc :: proc(
 	return
 }
 @(private)
-_arena_alloc :: proc(arena_allocator: ^ArenaAllocator, size: int) -> (ptr: [^]byte) {
-	ptr = ptr_add(raw_data(arena_allocator.buffer), arena_allocator.next)
-
-	alignment_offset := align_forward(ptr, 64) // align to 64B, so we can do a faster copy when resizing
-	ptr = ptr_add(ptr, alignment_offset)
-
-	arena_allocator.next += size + alignment_offset
-	return
+_arena_alloc :: proc(arena_allocator: ^ArenaAllocator, size: int) -> [^]byte #no_bounds_check {
+	ptr := uintptr(&arena_allocator.buffer[arena_allocator.next])
+	// NOTE: align forward to 64B, so we can do faster simd ops
+	ARENA_ALIGN :: 64
+	remainder := ptr & (ARENA_ALIGN - 1)
+	align_offset: uintptr
+	if remainder != 0 {align_offset = ARENA_ALIGN - remainder}
+	ptr += align_offset
+	// update allocator
+	arena_allocator.next += int(align_offset) + size
+	return ([^]byte)(ptr)
 }

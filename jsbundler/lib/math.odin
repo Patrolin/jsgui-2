@@ -12,17 +12,7 @@ Size :: distinct int
 
 // int procedures
 ptr_add :: #force_inline proc "contextless" (ptr: rawptr, offset: int) -> [^]byte {
-	return ([^]byte)(uintptr(ptr) + transmute(uintptr)(offset))
-}
-align_forward :: #force_inline proc(ptr: rawptr, align_power_of_two: int) -> int {
-	assert(is_power_of_two(align_power_of_two))
-	remainder := (uintptr(ptr)) & transmute(uintptr)(align_power_of_two - 1)
-	result := remainder == 0 ? 0 : transmute(uintptr)align_power_of_two - remainder
-	return transmute(int)result
-}
-align_backward :: #force_inline proc(ptr: rawptr, alignment_power_of_two: int) -> int {
-	result := uintptr(ptr) & (transmute(uintptr)alignment_power_of_two - 1)
-	return transmute(int)result
+	return ([^]byte)(uintptr(ptr) + uintptr(offset))
 }
 count_leading_zeros :: intrinsics.count_leading_zeros
 count_trailing_zeros :: intrinsics.count_trailing_zeros

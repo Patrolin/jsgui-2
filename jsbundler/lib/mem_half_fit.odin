@@ -73,7 +73,7 @@ half_fit_allocator_proc :: proc(
 	err: mem.Allocator_Error,
 ) {
 	half_fit := (^HalfFitAllocator)(allocator_data)
-	get_lock(&half_fit.lock)
+	wait_for_lock(&half_fit.lock)
 	defer release_lock(&half_fit.lock)
 	when DEBUG {
 		fmt.printfln(
