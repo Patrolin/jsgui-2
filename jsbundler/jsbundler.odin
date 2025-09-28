@@ -95,9 +95,9 @@ main :: proc() {
 	dir_for_watching: lib.WatchedDir
 	server: lib.Server
 	if serve_http {
-		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
 		lib.init_sockets()
 		lib.create_server_socket(&server, serve_port, serve_thread_count)
+		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
 		for i in 0 ..< serve_thread_count {
 			lib.start_thread(serve_http_proc, &server)
 		}
