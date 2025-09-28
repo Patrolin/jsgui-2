@@ -4,7 +4,7 @@ package lib
 init_page_fault_handler :: #force_inline proc "contextless" () {
 	SetUnhandledExceptionFilter(_page_fault_exception_handler)
 }
-_page_fault_exception_handler :: proc "std" (exception: ^_EXCEPTION_POINTERS) -> LONG {
+_page_fault_exception_handler :: proc "std" (exception: ^_EXCEPTION_POINTERS) -> CLONG {
 	if exception.ExceptionRecord.ExceptionCode == STATUS_ACCESS_VIOLATION {
 		ptr := exception.ExceptionRecord.ExceptionInformation[1]
 		page_ptr := rawptr(uintptr(ptr) & ~uintptr(PAGE_SIZE - 1))
@@ -16,7 +16,7 @@ _page_fault_exception_handler :: proc "std" (exception: ^_EXCEPTION_POINTERS) ->
 	return EXCEPTION_EXECUTE_HANDLER
 }
 page_reserve :: proc(size: Size) -> []byte {
-	ptr := VirtualAlloc(nil, ULONG_PTR(size), MEM_RESERVE, PAGE_READWRITE)
+	ptr := VirtualAlloc(nil, uint(size), MEM_RESERVE, PAGE_READWRITE)
 	return (cast([^]byte)ptr)[:size]
 }
 page_free :: proc(ptr: rawptr) -> b32 {

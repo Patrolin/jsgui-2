@@ -6,7 +6,6 @@ import "core:fmt"
 import "core:mem"
 import "core:strconv"
 import "core:text/regex"
-import "core:thread" // NOTE: this adds 19 KiB to the exe size, TODO: don't use core:thread
 import "lib"
 
 // globals
@@ -100,7 +99,7 @@ main :: proc() {
 		lib.init_sockets()
 		lib.create_server_socket(&server, serve_port, serve_thread_count)
 		for i in 0 ..< serve_thread_count {
-			thread.create_and_start_with_data(&server, serve_http_proc, nil, nil)
+			lib.start_thread(serve_http_proc, &server)
 		}
 		dir_for_watching = lib.open_dir_for_watching(SRC_PATH)
 	}

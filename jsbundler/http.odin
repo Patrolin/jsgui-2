@@ -1,4 +1,5 @@
 package main
+import "base:runtime"
 import "core:fmt"
 import "lib"
 
@@ -7,7 +8,8 @@ GET_START :: "GET "
 HTTP_END :: "\r\n\r\n"
 
 // procs
-serve_http_proc :: proc(data: rawptr) {
+serve_http_proc :: proc "system" (data: rawptr) -> u32 {
+	context = runtime.default_context()
 	when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 		context.allocator = shared_allocator
 		temp_buffer := lib.page_reserve(lib.GibiByte)

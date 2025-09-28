@@ -10,6 +10,16 @@ GibiByte :: Size(1024 * MebiByte)
 // types
 Size :: distinct int
 
+CSHORT :: i16
+CUSHORT :: u16
+CLONG :: i32
+CULONG :: u32
+CLONGLONG :: i64
+CULONGLONG :: u64
+
+CINT :: i32
+CUINT :: u32
+
 // int procedures
 ptr_add :: #force_inline proc "contextless" (ptr: rawptr, offset: int) -> [^]byte {
 	return ([^]byte)(uintptr(ptr) + uintptr(offset))

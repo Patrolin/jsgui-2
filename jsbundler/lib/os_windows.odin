@@ -47,18 +47,7 @@ BYTE :: u8
 WORD :: u16
 DWORD :: u32
 QWORD :: u64
-/* c types */
-SHORT :: i16
-USHORT :: u16
-LONG :: i32
-ULONG :: u32
-LONGLONG :: i64
-ULONGLONG :: u64
-
-CINT :: i32
-CUINT :: u32
-/* -c types */
-LARGE_INTEGER :: LONGLONG
+LARGE_INTEGER :: CLONGLONG
 
 GUID :: struct {
 	Data1: DWORD,
@@ -67,8 +56,8 @@ GUID :: struct {
 	Data4: [8]BYTE,
 }
 OVERLAPPED :: struct {
-	Internal:     ^ULONG,
-	InternalHigh: ^ULONG,
+	Internal:     ^CULONG,
+	InternalHigh: ^CULONG,
 	using _:      struct #raw_union {
 		using _: struct {
 			Offset:     DWORD,
@@ -98,7 +87,24 @@ _EXCEPTION_POINTERS :: struct {
 	ExceptionRecord: ^EXCEPTION_RECORD,
 	ContextRecord:   ^CONTEXT,
 }
-TOP_LEVEL_EXCEPTION_FILTER :: proc "std" (exception: ^_EXCEPTION_POINTERS) -> LONG
+TOP_LEVEL_EXCEPTION_FILTER :: proc "std" (exception: ^_EXCEPTION_POINTERS) -> CLONG
+
+SECURITY_DESCRIPTOR :: struct {
+	/*
+	Revision, Sbz1: BYTE,
+	Control:        SECURITY_DESCRIPTOR_CONTROL,
+	Owner, Group:   PSID,
+	Sacl, Dacl:     PACL,
+	*/
+}
+SECURITY_ATTRIBUTES :: struct {
+	nLength:              DWORD,
+	lpSecurityDescriptor: ^SECURITY_DESCRIPTOR,
+	bInheritHandle:       BOOL,
+}
+THREAD_START_ROUTINE :: proc "system" (param: rawptr) -> DWORD
+ThreadId :: distinct DWORD
+ThreadHandle :: distinct HANDLE
 
 // Kernel32.lib procs
 foreign import kernel32 "system:Kernel32.lib"
@@ -118,14 +124,15 @@ foreign kernel32 {
 	ExitProcess :: proc(uExitCode: CUINT) ---
 	// thread procs
 	Sleep :: proc(ms: DWORD) ---
+	CreateThread :: proc(attributes: ^SECURITY_ATTRIBUTES, stack_size: uint, thread_proc: THREAD_START_ROUTINE, param: rawptr, flags: DWORD, thread_id: ^ThreadId) -> ThreadHandle ---
 	// alloc procs
 	SetUnhandledExceptionFilter :: proc(filter_callback: TOP_LEVEL_EXCEPTION_FILTER) -> TOP_LEVEL_EXCEPTION_FILTER ---
-	VirtualAlloc :: proc(address: rawptr, size: ULONG_PTR, type, protect: DWORD) -> rawptr ---
-	VirtualFree :: proc(address: rawptr, size: ULONG_PTR, type: DWORD) -> BOOL ---
+	VirtualAlloc :: proc(address: rawptr, size: uint, type, protect: DWORD) -> rawptr ---
+	VirtualFree :: proc(address: rawptr, size: uint, type: DWORD) -> BOOL ---
 	// IOCP procs
 	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	GetQueuedCompletionStatus :: proc(iocp: HANDLE, bytes_transferred: ^DWORD, user_ptr: ^rawptr, overlapped: ^^OVERLAPPED, millis: DWORD) -> BOOL ---
-	CreateTimerQueueTimer :: proc(timer: ^HANDLE, timer_queue: HANDLE, callback: WAITORTIMERCALLBACK, user_ptr: rawptr, timeout_ms, period_ms: DWORD, flags: ULONG) -> BOOL ---
+	CreateTimerQueueTimer :: proc(timer: ^HANDLE, timer_queue: HANDLE, callback: WAITORTIMERCALLBACK, user_ptr: rawptr, timeout_ms, period_ms: DWORD, flags: CULONG) -> BOOL ---
 	DeleteTimerQueueTimer :: proc(timer_queue: HANDLE, timer: HANDLE, event: HANDLE) ---
 	CancelIoEx :: proc(handle: HANDLE, overlapped: ^OVERLAPPED) -> BOOL ---
 }
@@ -281,19 +288,6 @@ FILETIME :: struct {
 	dwLowDateTime:  DWORD,
 	dwHighDateTime: DWORD,
 }
-SECURITY_DESCRIPTOR :: struct {
-	/*
-	Revision, Sbz1: BYTE,
-	Control:        SECURITY_DESCRIPTOR_CONTROL,
-	Owner, Group:   PSID,
-	Sacl, Dacl:     PACL,
-	*/
-}
-SECURITY_ATTRIBUTES :: struct {
-	nLength:              DWORD,
-	lpSecurityDescriptor: ^SECURITY_DESCRIPTOR,
-	bInheritHandle:       BOOL,
-}
 
 // path procs
 @(default_calling_convention = "c")
@@ -358,7 +352,7 @@ WSAID_CONNECTX :: GUID {
 // socket types
 SOCKET :: distinct uintptr
 WSABUF :: struct {
-	len:    ULONG,
+	len:    CULONG,
 	buffer: [^]byte,
 }
 WinsockData :: struct {
