@@ -10,7 +10,7 @@ _ASCII_MAX_CHAR :: 0x7f
 @(private)
 _AsciiBitset :: distinct [2]u64
 @(private)
-_ascii_bit_set :: proc(ascii_chars: string) -> (ascii_set: _AsciiBitset) #no_bounds_check {
+_ascii_bitset :: proc(ascii_chars: string) -> (ascii_set: _AsciiBitset) #no_bounds_check {
 	for i in 0 ..< len(ascii_chars) {
 		char := ascii_chars[i]
 		assert(char <= _ASCII_MAX_CHAR)
@@ -42,7 +42,7 @@ index_ascii :: proc(str: string, start: int, ascii_chars: string) -> (middle: in
 	if len(ascii_chars) == 1 {
 		return index_ascii_char(str, start, ascii_chars[0])
 	} else {
-		as := _ascii_bit_set(ascii_chars)
+		as := _ascii_bitset(ascii_chars)
 		for i in start ..< len(str) {
 			if _ascii_bitset_contains(as, str[i]) {return i}
 		}

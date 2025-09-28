@@ -64,7 +64,7 @@ index_after :: proc(str: string, start: int, substr: string) -> (middle: int) {
 	return min(j, len(str))
 }
 /* returns the first byte offset of the first `substring` in the `str`, or `len(str)` when not found. */
-index_multi :: proc(str: string, start: int, substrings: ..string) -> (middle, pattern: int) {
+index_multi :: proc(str: string, start: int, substrings: ..string) -> (middle, substr_index: int) {
 	slice := str[start:]
 	N := len(slice)
 	// find smallest substring
