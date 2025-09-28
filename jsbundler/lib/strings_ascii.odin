@@ -1,5 +1,4 @@
 package lib
-import "base:intrinsics"
 import "core:bytes"
 
 // constants
@@ -27,30 +26,44 @@ _ascii_bitset_contains :: proc(as: _AsciiBitset, char: byte) -> bool #no_bounds_
 }
 
 // procs
-index_ascii :: proc "contextless" (str: string, char: byte) -> (byte_index: int) {
+index_ascii_char :: proc "contextless" (
+	str: string,
+	start: int,
+	ascii_char: byte,
+) -> (
+	middle: int,
+) {
 	/* TODO: do SIMD in a better way */
-	index_or_err := #force_inline bytes.index_byte(transmute([]u8)str, char)
-	return index_or_err == -1 ? len(str) : index_or_err
+	slice := str[start:]
+	index_or_err := #force_inline bytes.index_byte(transmute([]u8)str, ascii_char)
+	return index_or_err == -1 ? len(str) : start + index_or_err
 }
-index_ascii_after :: proc "contextless" (str: string, char: byte) -> (byte_index: int) {
-	return index_ascii(str, char) + 1
-}
-last_index_ascii :: proc "contextless" (str: string, char: byte) -> (byte_index: int) {
-	index_or_err := #force_inline bytes.last_index_byte(transmute([]u8)str, char)
-	return index_or_err
-}
-
-index_any_ascii :: proc(str: string, ascii_chars: string) -> int {
+index_ascii :: proc(str: string, start: int, ascii_chars: string) -> (middle: int) {
 	if len(ascii_chars) == 1 {
-		return index_ascii(str, ascii_chars[0])
+		return index_ascii_char(str, start, ascii_chars[0])
 	} else {
 		as := _ascii_bit_set(ascii_chars)
-		for i in 0 ..< len(str) {
+		for i in start ..< len(str) {
 			if _ascii_bitset_contains(as, str[i]) {return i}
 		}
 		return len(str)
 	}
 }
-index_any_ascii_after :: proc(str: string, ascii_chars: string) -> int {
-	return index_any_ascii(str, ascii_chars) + 1
+index_ignore_newline :: proc(str: string, start: int) -> (end: int) {
+	j := start
+	if j < len(str) && str[j] == '\r' {j += 1}
+	if j < len(str) && str[j] == '\n' {j += 1}
+	return j
+}
+index_ignore_newlines :: proc(str: string, start: int) -> (end: int) {
+	j := start
+	for j < len(str) && (str[j] == '\r' || str[j] == '\n') {
+		j += 1
+	}
+	return j
+}
+last_index_ascii_char :: proc "contextless" (str: string, ascii_char: byte) -> (start: int) {
+	/* TODO: do SIMD in a better way */
+	index_or_err := #force_inline bytes.last_index_byte(transmute([]u8)str, ascii_char)
+	return index_or_err == -1 ? -1 : index_or_err
 }

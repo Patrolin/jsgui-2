@@ -5,7 +5,6 @@ package main
 import "core:fmt"
 import "core:mem"
 import "core:strconv"
-import "core:text/regex"
 import "lib"
 
 // globals
@@ -119,7 +118,7 @@ rebuild_index_file :: proc() {
 	walk_data: WalkData
 	walk_proc :: proc(next_path: string, user_data: rawptr) {
 		walk_data := (^WalkData)(user_data)
-		extension_index := lib.last_index_ascii(next_path, '.')
+		extension_index := lib.last_index_ascii_char(next_path, '.')
 		extension := next_path[extension_index:]
 		if extension == ".js" || extension == ".mjs" {
 			file_text, ok := lib.read_file(next_path)
@@ -141,29 +140,28 @@ rebuild_index_file :: proc() {
 	}
 	lib.write_to_file(index_file, "</style>\n<script>\n")
 	for js_text in walk_data.js_texts {
-		i := 0
-		for i < len(js_text) && (js_text[i] == '\r' || js_text[i] == '\n') {
-			i += 1
-		}
-		// TODO: rewrite this with index_multi()
-		ignore_regex := "/\\*\\*.*?\\*/|import .*? from .*?[\n$]|export "
-		iterator, err := regex.create_iterator(js_text, ignore_regex, {.Multiline})
-		assert(err == nil)
-		match, index, ok := regex.match_iterator(&iterator)
-		index2 := lib.index_multi(js_text, "/**", "import ", "export ")
-		index3 := lib.index(js_text, "/**")
-		for ok {
-			j := match.pos[0][0]
-			if i < j {lib.write_to_file(index_file, js_text[i:j])}
-
-			i = match.pos[0][1]
-			for i < len(js_text) && (js_text[i] == '\r' || js_text[i] == '\n') {
-				i += 1
+		// skip starting whitespace
+		i := lib.index_ignore_newlines(js_text, 0)
+		for i < len(js_text) {
+			// find next pattern
+			middle, end, k := lib.index_multi_after(js_text, i, "/**", "import ", "export ")
+			lib.write_to_file(index_file, js_text[i:middle])
+			// handle the pattern
+			if middle < len(js_text) {
+				switch k {
+				case 0:
+					end = lib.index_after(js_text, end, "*/")
+					end = lib.index_ignore_newlines(js_text, end)
+				case 1:
+					end = lib.index_after(js_text, end, " from ")
+					end = lib.index_ascii(js_text, end, "\r\n")
+					end = lib.index_ignore_newlines(js_text, end)
+				case 2:
+				}
 			}
-
-			match, index, ok = regex.match_iterator(&iterator)
+			fmt.assertf(end > i, "end: %v, i: %v", end, i)
+			i = end
 		}
-		lib.write_to_file(index_file, js_text[i:])
 	}
 	lib.write_to_file(index_file, "</script>")
 	lib.close_file(index_file)

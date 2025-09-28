@@ -1,6 +1,5 @@
 package lib
 import "base:intrinsics"
-import "core:fmt"
 import "core:strings"
 
 // constants
@@ -26,47 +25,48 @@ ends_with :: proc(str, suffix: string) -> bool {
 hash_rabin_karp :: #force_inline proc "contextless" (hash, value: u32) -> u32 {
 	return hash * PRIME_RABIN_KARP + value
 }
-index :: proc "contextless" (str, substring: string) -> (byte_index: int) {
-	n := len(substring)
-	switch {
-	case n == 0:
-		return 0
-	case n == 1:
-		return index_ascii(str, substring[0])
-	case n == len(str):
-		return str == substring ? 0 : len(str)
-	case n > len(str):
-		return len(str)
-	}
+index :: proc "contextless" (str: string, start: int, substring: string) -> (middle: int) {
+	slice := str[start:]
+	N := len(slice)
+	M := len(substring)
+	if intrinsics.expect(M == 0, false) {return start}
+	if intrinsics.expect(M == 1, false) {return index_ascii_char(str, start, substring[0])}
+	if intrinsics.expect(M > N, false) {return len(str)}
 	// setup
 	hash, str_hash: u32
-	for i := 0; i < n; i += 1 {
+	for i := 0; i < M; i += 1 {
 		hash = hash_rabin_karp(hash, u32(substring[i]))
 	}
-	for i := 0; i < n; i += 1 {
-		str_hash = hash_rabin_karp(str_hash, u32(str[i]))
+	for i := 0; i < M; i += 1 {
+		str_hash = hash_rabin_karp(str_hash, u32(slice[i]))
 	}
-	if str_hash == hash && str[:n] == substring {
-		return 0
+	if str_hash == hash && slice[:M] == substring {
+		return start
 	}
 	// rolling hash
 	pow: u32 = 1
 	sq := u32(PRIME_RABIN_KARP)
-	for i := n; i > 0; i >>= 1 {
+	for i := M; i > 0; i >>= 1 {
 		if (i & 1) != 0 {pow *= sq}
 		sq *= sq
 	}
-	for i := n; i < len(str); {
-		str_hash = hash_rabin_karp(str_hash, u32(str[i])) - pow * u32(str[i - n])
+	for i := M; i < len(slice); {
+		str_hash = hash_rabin_karp(str_hash, u32(slice[i])) - pow * u32(slice[i - M])
 		i += 1
-		if str_hash == hash && str[i - n:i] == substring {
-			return i - n
+		if str_hash == hash && slice[i - M:i] == substring {
+			return start + i - M
 		}
 	}
 	return len(str)
 }
+index_after :: proc(str: string, start: int, substr: string) -> (middle: int) {
+	j := index(str, start, substr) + len(substr)
+	return min(j, len(str))
+}
 /* returns the first byte offset of the first `substring` in the `str`, or `len(str)` when not found. */
-index_multi :: proc(str: string, substrings: ..string) -> (byte_index: int) {
+index_multi :: proc(str: string, start: int, substrings: ..string) -> (middle, pattern: int) {
+	slice := str[start:]
+	N := len(slice)
 	// find smallest substring
 	smallest_substring := substrings[0]
 	for substr in substrings[1:] {
@@ -74,87 +74,52 @@ index_multi :: proc(str: string, substrings: ..string) -> (byte_index: int) {
 			smallest_substring = substr
 		}
 	}
-	if intrinsics.expect(len(smallest_substring) == 0, false) {return 0}
-	n := len(smallest_substring)
+	M := len(smallest_substring)
+	assert(M > 0)
+	if M > N {return len(str), 0}
 	// setup
 	hashes: [16]u32
-	k := len(substrings)
-	assert(k <= len(hashes))
-	for j in 0 ..< k {
-		substr := substrings[j]
+	K := len(substrings)
+	assert(K <= len(hashes))
+	for k in 0 ..< K {
+		substr := substrings[k]
 		hash: u32
-		for i := 0; i < n; i += 1 {
+		for i := 0; i < M; i += 1 {
 			hash = hash_rabin_karp(hash, u32(substr[i]))
 		}
-		hashes[j] = hash
+		hashes[k] = hash
 	}
 	str_hash: u32
-	for i := 0; i < n; i += 1 {
-		str_hash = hash_rabin_karp(str_hash, u32(str[i]))
+	for i := 0; i < M; i += 1 {
+		str_hash = hash_rabin_karp(str_hash, u32(slice[i]))
 	}
-	for j in 0 ..< k {
-		if str_hash != hashes[j] {continue}
-		substr := substrings[j]
-		end := min(len(substr), len(str))
-		if str[:end] == substr {return 0}
+	for k in 0 ..< K {
+		if str_hash != hashes[k] {continue}
+		substr := substrings[k]
+		j := min(len(substr), N)
+		if slice[:j] == substr {return start, k}
 	}
 	// rolling hash
 	pow: u32 = 1
 	sq := u32(PRIME_RABIN_KARP)
-	for i := n; i > 0; i >>= 1 {
+	for i := M; i > 0; i >>= 1 {
 		if (i & 1) != 0 {pow *= sq}
 		sq *= sq
 	}
-	for i := n; i < len(str); {
-		str_hash = hash_rabin_karp(str_hash, u32(str[i])) - pow * u32(str[i - n])
+	for i := M; i < N; {
+		str_hash = hash_rabin_karp(str_hash, u32(slice[i])) - pow * u32(slice[i - M])
 		i += 1
-		for j in 0 ..< k {
-			if str_hash != hashes[j] {continue}
-			substr := substrings[j]
-			end := min(i - n + len(substr), len(str))
-			if str[i - n:end] == substr {return i - n}
+		for k in 0 ..< K {
+			if str_hash != hashes[k] {continue}
+			substr := substrings[k]
+			j := min(i - M + len(substr), N)
+			if slice[i - M:j] == substr {return start + i - M, k}
 		}
 	}
-	return len(str)
+	return len(str), 0
 }
-
-/* returns the first byte offset of the last `substring` in the `str`, or `-1` when not found. */
-last_index :: proc(str, substring: string) -> (byte_index: int) {
-	n := len(substring)
-	switch {
-	case n == 0:
-		return len(str)
-	case n == 1:
-		return last_index_ascii(str, substring[0])
-	case n == len(str):
-		return str == substring ? 0 : -1
-	case n > len(str):
-		return -1
-	}
-	// setup
-	last := len(str) - n
-	hash, str_hash: u32
-	for i := n - 1; i >= 0; i -= 1 {
-		hash = hash_rabin_karp(hash, u32(substring[i]))
-	}
-	for i := len(str) - 1; i >= last; i -= 1 {
-		str_hash = hash_rabin_karp(str_hash, u32(str[i]))
-	}
-	if str_hash == hash && str[last:] == substring {
-		return last
-	}
-	// rolling hash
-	pow: u32 = 1
-	sq := u32(PRIME_RABIN_KARP)
-	for i := n; i > 0; i >>= 1 {
-		if (i & 1) != 0 {pow *= sq}
-		sq *= sq
-	}
-	for i := last - 1; i >= 0; i -= 1 {
-		str_hash = hash_rabin_karp(str_hash, u32(str[i])) - pow * u32(str[i + n])
-		if str_hash == hash && str[i:i + n] == substring {
-			return i
-		}
-	}
-	return -1
+index_multi_after :: proc(str: string, start: int, substrings: ..string) -> (middle, end, k: int) {
+	middle, k = index_multi(str, start, ..substrings)
+	end = min(middle + len(substrings[k]), len(str))
+	return
 }
