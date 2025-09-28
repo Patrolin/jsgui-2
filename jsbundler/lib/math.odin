@@ -48,12 +48,12 @@ get_bit :: #force_inline proc "contextless" (
 ) -> T where intrinsics.type_is_unsigned(T) {
 	return (x >> bit_index) & 1
 }
-set_bit_one :: #force_inline proc "contextless" (
+set_bit_to_one :: #force_inline proc "contextless" (
 	x, bit_index: $T,
 ) -> T where intrinsics.type_is_unsigned(T) {
 	return x | (1 << bit_index)
 }
-set_bit_zero :: #force_inline proc "contextless" (
+set_bit_to_zero :: #force_inline proc "contextless" (
 	x, bit_index: $T,
 ) -> T where intrinsics.type_is_unsigned(T) {
 	return x & ~(1 << bit_index)
