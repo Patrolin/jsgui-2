@@ -1,5 +1,6 @@
 package lib
 import "base:intrinsics"
+import "core:fmt"
 import "core:mem"
 
 // constants
@@ -19,12 +20,6 @@ CACHE_LINE_SIZE :: 1 << CACHE_LINE_SIZE_EXPONENT
 
 // types
 Lock :: distinct bool
-ArenaAllocator :: struct {
-	buffer: []byte `fmt:"%p"`,
-	next:   int,
-	/* NOTE: for asserting single-threaded */
-	lock:   Lock,
-}
 
 // lock procedures
 mfence :: #force_inline proc "contextless" () {
@@ -51,7 +46,7 @@ release_lock :: #force_inline proc "contextless" (lock: ^Lock) {
 zero :: proc(buffer: []byte) {
 	dest := uintptr(raw_data(buffer))
 	dest_end := dest + uintptr(len(buffer))
-	dest_end_64B := dest_end - 63
+	dest_end_64B := dest_end & 63
 	zero_src := (#simd[64]byte)(0)
 	for dest < dest_end_64B {
 		(^#simd[64]byte)(dest)^ = zero_src
@@ -66,7 +61,7 @@ copy :: proc(from, to: []byte) {
 	src := uintptr(raw_data(from))
 	dest := uintptr(raw_data(to))
 	dest_end := dest + uintptr(min(len(from), len(to)))
-	dest_end_64B := dest_end - 63
+	dest_end_64B := dest_end & 63
 	for dest < dest_end_64B {
 		(^#simd[64]byte)(dest)^ = (^#simd[64]byte)(src)^
 		dest += 64
@@ -79,9 +74,20 @@ copy :: proc(from, to: []byte) {
 	}
 }
 
+// arena types
+ArenaAllocator :: struct {
+	buffer_start: uintptr,
+	buffer_end:   uintptr,
+	next_ptr:     uintptr,
+	/* NOTE: for asserting single-threaded */
+	lock:         Lock,
+}
+
 // arena procedures
 arena_allocator :: proc(arena_allocator: ^ArenaAllocator, buffer: []byte) -> mem.Allocator {
-	arena_allocator^ = ArenaAllocator{buffer, 0, false}
+	buffer_start := uintptr(raw_data(buffer))
+	buffer_end := buffer_start + uintptr(len(buffer))
+	arena_allocator^ = ArenaAllocator{buffer_start, buffer_end, buffer_start, false}
 	return mem.Allocator{arena_allocator_proc, arena_allocator}
 }
 arena_allocator_proc :: proc(
@@ -95,9 +101,6 @@ arena_allocator_proc :: proc(
 	data: []byte,
 	err: mem.Allocator_Error,
 ) {
-	DEBUG :: false
-	when DEBUG {fmt.printfln("mode: %v, size: %v, loc: %v", mode, size, loc)}
-
 	arena_allocator := (^ArenaAllocator)(allocator)
 	// assert single threaded
 	ok := get_lock(&arena_allocator.lock)
@@ -106,31 +109,48 @@ arena_allocator_proc :: proc(
 
 	#partial switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		ptr := _arena_alloc(arena_allocator, size)
-		data = ptr[:size]
-		err = arena_allocator.next > len(arena_allocator.buffer) ? .Out_Of_Memory : .None
-		if mode == .Alloc {zero(data)}
-	case .Resize, .Resize_Non_Zeroed:
-		// TODO: fast path if old_ptr is at the end of the used space
 		// alloc
-		ptr := _arena_alloc(arena_allocator, size)
-		data = ptr[:size]
-		if (intrinsics.expect(arena_allocator.next > len(arena_allocator.buffer), false)) {
+		data = _arena_alloc(arena_allocator, size)
+		if intrinsics.expect(arena_allocator.next_ptr > arena_allocator.buffer_end, false) {
 			err = .Out_Of_Memory
 			break
 		}
-		// copy
-		old_data := ([^]byte)(old_ptr)[:old_size]
-		if mode == .Resize {zero(data)}
-		copy(old_data, data)
+		// zero
+		if mode == .Alloc {zero(data)}
+	case .Resize, .Resize_Non_Zeroed:
+		new_section_ptr := uintptr(old_ptr) + uintptr(old_size)
+		if new_section_ptr == arena_allocator.next_ptr {
+			// resize in place
+			data = ([^]byte)(old_ptr)[:size]
+			arena_allocator.next_ptr = uintptr(old_ptr) + uintptr(size)
+			if intrinsics.expect(arena_allocator.next_ptr > arena_allocator.buffer_end, false) {
+				err = .Out_Of_Memory
+				break
+			}
+			if intrinsics.expect(size > old_size, true) {
+				new_section := ([^]byte)(new_section_ptr)[:size - old_size]
+				if mode == .Resize {zero(new_section)}
+			}
+		} else {
+			// alloc
+			data = _arena_alloc(arena_allocator, size)
+			if intrinsics.expect(arena_allocator.next_ptr > arena_allocator.buffer_end, false) {
+				err = .Out_Of_Memory
+				break
+			}
+			// copy
+			old_data := ([^]byte)(old_ptr)[:old_size]
+			if mode == .Resize {zero(data)}
+			copy(old_data, data)
+		}
 	case .Free_All:
-		arena_allocator.next = 0
+		arena_allocator.next_ptr = arena_allocator.buffer_start
 	}
 	return
 }
 @(private)
-_arena_alloc :: proc(arena_allocator: ^ArenaAllocator, size: int) -> [^]byte #no_bounds_check {
-	ptr := uintptr(&arena_allocator.buffer[arena_allocator.next])
+_arena_alloc :: proc(arena_allocator: ^ArenaAllocator, size: int) -> []byte {
+	ptr := arena_allocator.next_ptr
 	// NOTE: align forward to 64B, so we can do faster simd ops
 	ARENA_ALIGN :: 64
 	remainder := ptr & (ARENA_ALIGN - 1)
@@ -138,6 +158,6 @@ _arena_alloc :: proc(arena_allocator: ^ArenaAllocator, size: int) -> [^]byte #no
 	if remainder != 0 {align_offset = ARENA_ALIGN - remainder}
 	ptr += align_offset
 	// update allocator
-	arena_allocator.next += int(align_offset) + size
-	return ([^]byte)(ptr)
+	arena_allocator.next_ptr = ptr + uintptr(size)
+	return ([^]byte)(ptr)[:size]
 }
