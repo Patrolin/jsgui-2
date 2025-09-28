@@ -19,7 +19,7 @@ SRC_PATH :: "src" /* NOTE: FILES_TO_INIT needs hardcoded paths.. */
 JSGUI_VERSION :: #load("../src/jsgui/jsgui_version.txt", string)
 FileToInit :: struct {
 	path: string,
-	// if data == "" {Create a directory} else {Create a file}
+	/* if data == "" {Create a directory} else {Create a file} */
 	data: string,
 }
 FILES_TO_INIT :: []FileToInit {

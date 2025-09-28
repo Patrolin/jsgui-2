@@ -1,8 +1,5 @@
 package lib
-import "base:intrinsics"
-import "base:runtime"
 import "core:fmt"
-import "core:time" // TODO: don't use core:time
 
 // constants
 ERROR_IO_INCOMPLETE :: 996
@@ -99,7 +96,7 @@ wait_for_file_changes :: proc(dir: ^WatchedDir) {
 			file_size: LARGE_INTEGER = 0
 			for file_size != prev_file_size {
 				prev_file_size = file_size
-				time.sleep(1 * time.Microsecond)
+				Sleep(0) // NOTE: let other threads run first
 				GetFileSizeEx(FileHandle(file), &file_size)
 			}
 

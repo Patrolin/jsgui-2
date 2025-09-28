@@ -116,6 +116,8 @@ foreign kernel32 {
 	// process procs
 	GetCommandLineW :: proc() -> CWSTR ---
 	ExitProcess :: proc(uExitCode: CUINT) ---
+	// thread procs
+	Sleep :: proc(ms: DWORD) ---
 	// alloc procs
 	SetUnhandledExceptionFilter :: proc(filter_callback: TOP_LEVEL_EXCEPTION_FILTER) -> TOP_LEVEL_EXCEPTION_FILTER ---
 	VirtualAlloc :: proc(address: rawptr, size: ULONG_PTR, type, protect: DWORD) -> rawptr ---
