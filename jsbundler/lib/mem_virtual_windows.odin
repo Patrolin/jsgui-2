@@ -17,7 +17,7 @@ _page_fault_exception_handler :: proc "std" (exception: ^_EXCEPTION_POINTERS) ->
 }
 page_reserve :: proc(size: Size) -> []byte {
 	ptr := VirtualAlloc(nil, uint(size), MEM_RESERVE, PAGE_READWRITE)
-	return (cast([^]byte)ptr)[:size]
+	return ([^]byte)(ptr)[:size]
 }
 page_free :: proc(ptr: rawptr) -> b32 {
 	return b32(VirtualFree(ptr, 0, MEM_RELEASE))

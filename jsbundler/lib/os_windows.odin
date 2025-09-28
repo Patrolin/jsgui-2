@@ -172,7 +172,7 @@ tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocat
 		nil,
 	)
 	assert(written_bytes == cstr_len)
-	return transmute(string)(str_buf[:str_len])
+	return string(str_buf[:str_len])
 }
 @(private = "file")
 tprint_string16 :: proc(wstr: string16, allocator := context.temp_allocator) -> string {

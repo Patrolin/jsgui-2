@@ -142,11 +142,11 @@ _half_fit_split_size_and_flags :: proc(
 ) {
 	is_used = (size_and_flags >> 63) != 0
 	is_last = ((size_and_flags >> 62) & 1) != 0
-	size = transmute(int)((size_and_flags << 2) >> 2)
+	size = int((size_and_flags << 2) >> 2)
 	return
 }
 _half_fit_merge_size_and_flags :: proc(is_used: bool, is_last: bool, size: int) -> uint {
-	return (uint(is_used) << 63) | (uint(is_last) << 62) | transmute(uint)((size << 2) >> 2)
+	return (uint(is_used) << 63) | (uint(is_last) << 62) | ((uint(size) << 2) >> 2)
 }
 
 _half_fit_create_new_block :: proc(
@@ -197,7 +197,7 @@ half_fit_alloc :: proc(
 	err: runtime.Allocator_Error,
 ) {
 	// get next free block
-	size_index, list_index := _half_fit_data_index(half_fit, transmute(uint)data_size)
+	size_index, list_index := _half_fit_data_index(half_fit, uint(data_size))
 	data_size := HALF_FIT_MIN_BLOCK_DATA_SIZE << size_index
 	free_list := &half_fit.free_lists[list_index]
 	block_header := (^HalfFitBlockHeader)(free_list.next_free)
@@ -216,7 +216,7 @@ half_fit_alloc :: proc(
 	assert(!is_used, loc = loc)
 	if intrinsics.expect(prev_size >= data_size + HALF_FIT_MIN_BLOCK_SIZE, true) {
 		next_block := ptr_add(ptr, data_size)
-		block_header.size_and_flags = transmute(uint)data_size
+		block_header.size_and_flags = uint(data_size)
 		_half_fit_create_new_block(
 			half_fit,
 			block_header,

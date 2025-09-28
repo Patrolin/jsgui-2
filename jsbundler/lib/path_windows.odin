@@ -201,7 +201,7 @@ read_file :: proc(file_path: string) -> (text: string, ok: bool) {
 		for {
 			ReadFile(FileHandle(file), &buffer[0], len(buffer), &bytes_read, nil)
 			if bytes_read == 0 {break}
-			fmt.sbprint(&sb, transmute(string)(buffer[:bytes_read]))
+			fmt.sbprint(&sb, string(buffer[:bytes_read]))
 		}
 		CloseHandle(file)
 		text = to_string(sb)
