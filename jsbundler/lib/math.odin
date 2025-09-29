@@ -43,30 +43,6 @@ high_mask :: #force_inline proc "contextless" (
 ) -> T where intrinsics.type_is_unsigned(T) {
 	return ~(power_of_two - 1)
 }
-get_bit :: #force_inline proc "contextless" (
-	x, bit_index: $T,
-) -> T where intrinsics.type_is_unsigned(T) {
-	return (x >> bit_index) & 1
-}
-set_bit_to_one :: #force_inline proc "contextless" (
-	x, bit_index: $T,
-) -> T where intrinsics.type_is_unsigned(T) {
-	return x | (1 << bit_index)
-}
-set_bit_to_zero :: #force_inline proc "contextless" (
-	x, bit_index: $T,
-) -> T where intrinsics.type_is_unsigned(T) {
-	return x & ~(1 << bit_index)
-}
-set_bit :: #force_inline proc "contextless" (
-	x, bit_index, bit_value: $T,
-) -> T where intrinsics.type_is_unsigned(T) {
-	x_without_bit := x & ~(1 << bit_index)
-	bit := ((bit_value & 1) << bit_index)
-	return x | bit
-	//toggle_bit := ((x >> bit_index) ~ bit_value) & 1
-	//return x ~ (toggle_bit << bit_index)
-}
 /* AKA find_first_set() */
 log2_floor :: #force_inline proc "contextless" (x: $T) -> T where intrinsics.type_is_unsigned(T) {
 	return x > 0 ? size_of(T) * 8 - 1 - count_leading_zeros(x) : 0
