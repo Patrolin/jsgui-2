@@ -28,21 +28,6 @@ count_leading_zeros :: intrinsics.count_leading_zeros
 count_trailing_zeros :: intrinsics.count_trailing_zeros
 count_ones :: intrinsics.count_ones
 count_zeros :: intrinsics.count_zeros
-is_power_of_two :: #force_inline proc "contextless" (
-	x: $T,
-) -> bool where intrinsics.type_is_integer(T) {
-	return count_ones(x) == 1
-}
-low_mask :: #force_inline proc "contextless" (
-	power_of_two: $T,
-) -> T where intrinsics.type_is_unsigned(T) {
-	return power_of_two - 1
-}
-high_mask :: #force_inline proc "contextless" (
-	power_of_two: $T,
-) -> T where intrinsics.type_is_unsigned(T) {
-	return ~(power_of_two - 1)
-}
 /* AKA find_first_set() */
 log2_floor :: #force_inline proc "contextless" (x: $T) -> T where intrinsics.type_is_unsigned(T) {
 	return x > 0 ? size_of(T) * 8 - 1 - count_leading_zeros(x) : 0
@@ -53,7 +38,7 @@ log2_ceil :: #force_inline proc "contextless" (x: $T) -> T where intrinsics.type
 
 // float procedures
 @(private)
-_split_float_any :: proc "contextless" (x: $F, mask, shift, bias: $U) -> (int, frac: F) {
+split_float_any :: proc "contextless" (x: $F, mask, shift, bias: $U) -> (int, frac: F) {
 	#assert(size_of(F) == size_of(U))
 	negate := x < 0
 	x := negate ? -x : x
@@ -69,13 +54,13 @@ _split_float_any :: proc "contextless" (x: $F, mask, shift, bias: $U) -> (int, f
 	return negate ? -int : int, negate ? -frac : frac
 }
 split_float_f16 :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
-	return _split_float_any(x, u16(0x1f), 16 - 6, 0xf)
+	return split_float_any(x, u16(0x1f), 16 - 6, 0xf)
 }
 split_float_f32 :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
-	return _split_float_any(x, u32(0xff), 32 - 9, 0x7f)
+	return split_float_any(x, u32(0xff), 32 - 9, 0x7f)
 }
 split_float_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
-	return _split_float_any(x, u64(0x7ff), 64 - 12, 0x3ff)
+	return split_float_any(x, u64(0x7ff), 64 - 12, 0x3ff)
 }
 split_float :: proc {
 	split_float_f16,

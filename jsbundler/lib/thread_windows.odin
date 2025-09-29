@@ -9,7 +9,7 @@ ThreadInfo :: struct {
 start_thread :: proc(
 	thread_proc: ThreadProc,
 	param: rawptr,
-	stack_size: uint = 0,
+	stack_size: Size = 0,
 ) -> (
 	info: ThreadInfo,
 ) {

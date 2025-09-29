@@ -124,11 +124,11 @@ foreign kernel32 {
 	ExitProcess :: proc(uExitCode: CUINT) ---
 	// thread procs
 	Sleep :: proc(ms: DWORD) ---
-	CreateThread :: proc(attributes: ^SECURITY_ATTRIBUTES, stack_size: uint, thread_proc: THREAD_START_ROUTINE, param: rawptr, flags: DWORD, thread_id: ^ThreadId) -> ThreadHandle ---
+	CreateThread :: proc(attributes: ^SECURITY_ATTRIBUTES, stack_size: Size, thread_proc: THREAD_START_ROUTINE, param: rawptr, flags: DWORD, thread_id: ^ThreadId) -> ThreadHandle ---
 	// alloc procs
 	SetUnhandledExceptionFilter :: proc(filter_callback: TOP_LEVEL_EXCEPTION_FILTER) -> TOP_LEVEL_EXCEPTION_FILTER ---
-	VirtualAlloc :: proc(address: rawptr, size: uint, type, protect: DWORD) -> rawptr ---
-	VirtualFree :: proc(address: rawptr, size: uint, type: DWORD) -> BOOL ---
+	VirtualAlloc :: proc(address: rawptr, size: Size, type, protect: DWORD) -> rawptr ---
+	VirtualFree :: proc(address: rawptr, size: Size, type: DWORD) -> BOOL ---
 	// IOCP procs
 	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: ULONG_PTR, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
 	GetQueuedCompletionStatus :: proc(iocp: HANDLE, bytes_transferred: ^DWORD, user_ptr: ^rawptr, overlapped: ^^OVERLAPPED, millis: DWORD) -> BOOL ---
