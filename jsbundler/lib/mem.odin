@@ -21,7 +21,7 @@ CACHE_LINE_SIZE :: 1 << CACHE_LINE_SIZE_EXPONENT
 // types
 Lock :: distinct bool
 
-// lock procedures
+// lock procs
 mfence :: #force_inline proc "contextless" () {
 	intrinsics.atomic_thread_fence(.Seq_Cst)
 }
@@ -42,7 +42,7 @@ release_lock :: #force_inline proc "contextless" (lock: ^Lock) {
 	intrinsics.atomic_store(lock, false)
 }
 
-// copy procedures
+// copy procs
 zero :: proc(buffer: []byte) {
 	dest := uintptr(raw_data(buffer))
 	dest_end := dest + uintptr(len(buffer))
@@ -83,7 +83,7 @@ ArenaAllocator :: struct {
 	lock:         Lock,
 }
 
-// arena procedures
+// arena procs
 arena_allocator :: proc(arena_allocator: ^ArenaAllocator, buffer: []byte) -> mem.Allocator {
 	buffer_start := uintptr(raw_data(buffer))
 	buffer_end := buffer_start + uintptr(len(buffer))

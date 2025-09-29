@@ -43,7 +43,7 @@ HalfFitBlockHeader :: struct #align (CACHE_LINE_SIZE) {
 }
 #assert(size_of(HalfFitBlockHeader) == CACHE_LINE_SIZE)
 
-// procedures
+// procs
 half_fit_allocator :: proc(half_fit: ^HalfFitAllocator, buffer: []u8) -> mem.Allocator {
 	/* NOTE: HalfFitAllocator can't be easily copied, since there's a doubly linked list pointing to it, so we initialize it in-place */
 	half_fit.available_bitfield = 0

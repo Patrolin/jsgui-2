@@ -5,6 +5,8 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
 
+/* NOTE: Windows ships only on x64 */
+
 // globals
 _winsock: WinsockData
 

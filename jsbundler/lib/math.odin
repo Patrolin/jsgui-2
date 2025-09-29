@@ -20,7 +20,7 @@ CULONGLONG :: u64
 CINT :: i32
 CUINT :: u32
 
-// int procedures
+// int procs
 ptr_add :: #force_inline proc "contextless" (ptr: rawptr, offset: int) -> [^]byte {
 	return ([^]byte)(uintptr(ptr) + uintptr(offset))
 }
@@ -36,7 +36,7 @@ log2_ceil :: #force_inline proc "contextless" (x: $T) -> T where intrinsics.type
 	return x > 1 ? size_of(T) * 8 - 1 - count_leading_zeros((x - 1) << 1) : 0
 }
 
-// float procedures
+// float procs
 @(private)
 split_float_any :: proc "contextless" (x: $F, mask, shift, bias: $U) -> (int, frac: F) {
 	#assert(size_of(F) == size_of(U))

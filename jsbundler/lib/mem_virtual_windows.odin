@@ -1,6 +1,6 @@
 package lib
 
-// procedures
+// procs
 init_page_fault_handler :: #force_inline proc "contextless" () {
 	SetUnhandledExceptionFilter(_page_fault_exception_handler)
 }
@@ -17,8 +17,9 @@ _page_fault_exception_handler :: proc "std" (exception: ^_EXCEPTION_POINTERS) ->
 }
 page_reserve :: proc(size: Size) -> []byte {
 	ptr := VirtualAlloc(nil, size, MEM_RESERVE, PAGE_READWRITE)
+	assert(ptr != INVALID_HANDLE)
 	return ([^]byte)(ptr)[:size]
 }
-page_free :: proc(ptr: rawptr) -> b32 {
-	return b32(VirtualFree(ptr, 0, MEM_RELEASE))
+page_free :: proc(ptr: rawptr) {
+	assert(bool(VirtualFree(ptr, 0, MEM_RELEASE)))
 }
