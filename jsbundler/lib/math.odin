@@ -7,6 +7,9 @@ KibiByte :: Size(1024 * Byte)
 MebiByte :: Size(1024 * KibiByte)
 GibiByte :: Size(1024 * MebiByte)
 
+/* NOTE: *NOT* the max path on windows anymore, but half the apis don't support paths above this... */
+WINDOWS_MAX_PATH :: 260
+
 // types
 Size :: distinct int
 

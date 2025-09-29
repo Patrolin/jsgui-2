@@ -38,6 +38,9 @@ EXCEPTION_EXECUTE_HANDLER :: 1
 EXCEPTION_CONTINUE_SEARCH :: 0
 EXCEPTION_CONTINUE_EXECUTION :: -1
 
+ERROR_IO_INCOMPLETE :: 996
+ERROR_IO_PENDING :: 997
+
 // types
 ULONG_PTR :: uintptr
 HANDLE :: distinct rawptr
@@ -247,9 +250,6 @@ FILE_NOTIFY_CHANGE_SECURITY :: 0x00000100
 
 ERROR_PATH_NOT_FOUND :: 3
 
-/* NOTE: *NOT* the max path on windows anymore, but half the apis don't support paths above this... */
-MAX_PATH :: 260
-
 // dir types
 DirHandle :: distinct HANDLE
 FindFile :: distinct HANDLE
@@ -269,7 +269,7 @@ WIN32_FIND_DATAW :: struct {
 	dwReserved0:        DWORD,
 	dwReserved1:        DWORD,
 	/* worst api design ever? */
-	cFileName:          [MAX_PATH]u16,
+	cFileName:          [WINDOWS_MAX_PATH]u16,
 	cAlternateFileName: [14]u16,
 	/* Obsolete. Do not use */
 	dwFileType:         DWORD,
