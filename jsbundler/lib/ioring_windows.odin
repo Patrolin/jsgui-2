@@ -13,7 +13,7 @@ IoringEvent :: struct {
 ioring_create :: proc() -> (ioring: Ioring) {
 	/* NOTE: allow up to `logical_cores` threads */
 	ioring = CreateIoCompletionPort(INVALID_HANDLE, nil, 0, 0)
-	fmt.assertf(ioring != nil, "Failed to create ioring, err: %v", GetLastError())
+	fmt.assertf(ioring != nil, "Failed to create ioring")
 	return
 }
 ioring_set_timer_async :: proc(
