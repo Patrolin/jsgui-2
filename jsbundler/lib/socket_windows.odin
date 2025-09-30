@@ -11,7 +11,7 @@ Socket :: SOCKET
 Server :: struct {
 	socket:   Socket,
 	address:  SocketAddress,
-	iocp:     HANDLE,
+	iocp:     IocpHandle,
 	AcceptEx: ACCEPT_EX,
 }
 AsyncClient :: struct {
@@ -20,7 +20,7 @@ AsyncClient :: struct {
 	socket:                Socket,
 	address:               SocketAddress,
 	state:                 AsyncClientState,
-	timeout_timer:         HANDLE,
+	timeout_timer:         TimerHandle,
 	async_write_file_path: CWSTR,
 	async_write_file:      FileHandle,
 	async_write_slice:     TRANSMIT_FILE_BUFFERS `fmt:"-"`,
@@ -100,7 +100,7 @@ _accept_client_async :: proc(server: ^Server) {
 		CONNECTION_TYPE_STREAM,
 		PROTOCOL_TCP,
 		nil,
-		0,
+		.None,
 		WSA_FLAG_OVERLAPPED,
 	)
 	fmt.assertf(client.socket != INVALID_SOCKET, "Failed to create a client socket")
@@ -143,7 +143,7 @@ _receive_client_data_async :: proc(client: ^AsyncClient) {
 	)
 	err := WSAGetLastError()
 	fmt.assertf(
-		has_error == 0 || err == WSA_IO_PENDING,
+		has_error == 0 || err == ERROR_IO_PENDING,
 		"Failed to read data asynchronously, %v",
 		err,
 	)
@@ -218,7 +218,7 @@ send_file_response_and_close_client :: proc(client: ^AsyncClient, header: []byte
 		TF_DISCONNECT | TF_REUSE_SOCKET,
 	)
 	err := WSAGetLastError()
-	fmt.assertf(ok == true || err == WSA_IO_PENDING, "Failed to send response, err: %v", err)
+	fmt.assertf(ok == true || err == ERROR_IO_PENDING, "Failed to send response, err: %v", err)
 }
 cancel_timeout :: proc "std" (client: ^AsyncClient) {
 	DeleteTimerQueueTimer(nil, client.timeout_timer, nil)
@@ -266,10 +266,11 @@ wait_for_next_socket_event :: proc(server: ^Server) -> (client: ^AsyncClient) {
 		}
 	}
 
-	on_timeout :: proc "std" (user_ptr: rawptr, _TimerOrWaitFired: BOOL) {
+	on_timeout :: proc "system" (user_ptr: rawptr, _TimerOrWaitFired: BOOL) {
 		client := (^AsyncClient)(user_ptr)
 		if client.state == .Reading {
-			cancel_io_and_close_client(client) // NOTE: we call CancelIoEx(), which makes windows send an ERROR_OPERATION_ABORTED
+			/* NOTE: we call CancelIoEx(), which makes windows send an ERROR_OPERATION_ABORTED */
+			cancel_io_and_close_client(client)
 		}
 	}
 	switch client.state {
