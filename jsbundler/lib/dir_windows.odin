@@ -10,7 +10,7 @@ WatchedDir :: struct {
 }
 #assert(size_of(WatchedDir) == 4096)
 
-ioring_open_dir_for_watching :: proc(ioring: ^Ioring, dir: ^WatchedDir) {
+ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 	// open directory
 	dir.handle = DirHandle(
 		CreateFileW(
@@ -26,11 +26,11 @@ ioring_open_dir_for_watching :: proc(ioring: ^Ioring, dir: ^WatchedDir) {
 	)
 	fmt.assertf(dir.handle != nil, "Failed to open directory for watching: '%v'", dir.path)
 	// associate with ioring
-	assert(CreateIoCompletionPort(HANDLE(dir.handle), ioring.handle, 0, 0) != nil)
+	assert(CreateIoCompletionPort(HANDLE(dir.handle), ioring, 0, 0) != nil)
 	return
 }
 /* NOTE: same caveats as walk_files() */
-ioring_create_watched_dir :: proc(ioring: ^Ioring, dir: ^WatchedDir) {
+ioring_create_watched_dir :: proc(ioring: Ioring, dir: ^WatchedDir) {
 	ok := ReadDirectoryChangesW(
 		dir.handle,
 		&dir.async_buffer[0],

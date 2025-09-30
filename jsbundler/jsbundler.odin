@@ -91,16 +91,17 @@ main :: proc() {
 		}
 	}
 
-	ioring := lib.ioring_create()
-	watched_dir: lib.WatchedDir
-	server: lib.Server
 	if serve_http {
+		ioring := lib.ioring_create()
+		watched_dir: lib.WatchedDir
+		lib.ioring_open_dir_for_watching(ioring, &watched_dir)
+		lib.ioring_create_watched_dir(ioring, &watched_dir)
+
+		server: lib.Server
 		lib.init_sockets()
 		// TODO: create server socket on existing ioring
 		//lib.create_server_socket(&server, serve_port, serve_thread_count)
 		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
-		lib.ioring_open_dir_for_watching(&ioring, &watched_dir)
-		lib.ioring_create_watched_dir(&ioring, &watched_dir)
 		for i in 0 ..< serve_thread_count {
 			lib.start_thread(serve_http_proc, &server)
 		}

@@ -198,6 +198,7 @@ WAITORTIMERCALLBACK :: proc "std" (user_ptr: rawptr, TimerOrWaitFired: BOOL)
 @(default_calling_convention = "c")
 foreign kernel32 {
 	CreateIoCompletionPort :: proc(file: HANDLE, existing_iocp: IocpHandle, completion_key: ULONG_PTR, max_threads: DWORD) -> IocpHandle ---
+	PostQueuedCompletionStatus :: proc(iocp: IocpHandle, bytes_transferred: DWORD, completion_key: ULONG_PTR, overlapped: ^OVERLAPPED) -> BOOL ---
 	GetQueuedCompletionStatus :: proc(iocp: IocpHandle, bytes_transferred: ^DWORD, user_ptr: ^rawptr, overlapped: ^^OVERLAPPED, millis: DWORD) -> BOOL ---
 	CreateTimerQueueTimer :: proc(timer: ^TimerHandle, timer_queue: TimerQueueHandle, timer_callback: WAITORTIMERCALLBACK, user_ptr: rawptr, timeout_ms, period_ms: DWORD, flags: CULONG) -> BOOL ---
 	DeleteTimerQueueTimer :: proc(timer_queue: TimerQueueHandle, timer: TimerHandle, event: HANDLE) -> BOOL ---
