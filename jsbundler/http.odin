@@ -11,11 +11,14 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 	client := lib.handle_socket_event(server, event)
 	switch client.state {
 	case .New:
+		// start reading data
 		client.state = .Reading
 		lib.receive_client_data_async(client)
+		// accept another connection
 		lib.accept_client_async(server)
 	case .Reading:
 		request := transmute(string)(client.async_rw_buffer[:client.async_rw_pos])
+		// send response if valid request
 		if len(request) >= len(GET_START) {
 			if !lib.starts_with(request, GET_START) {
 				lib.cancel_io_and_close_client(client)
@@ -36,11 +39,15 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 				return
 			}
 		}
+		// else wait for more data
 		lib.receive_client_data_async(client)
 	case .SendingFileResponseAndClosing:
 	/* NOTE: handled by OS */
 	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
-		client.state = .ClosedByServer
+		lib.close_client(client)
+	}
+
+	if client.state == .ClosedByServer {
 		if client.async_write_file != nil {lib.close_file(client.async_write_file)}
 		free(client)
 	}

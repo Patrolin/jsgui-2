@@ -270,8 +270,8 @@ cancel_io_and_close_client :: proc "system" (client: ^Client) {
 	}
 }
 close_client :: proc "system" (client: ^Client) {
-	closesocket(client.socket)
 	cancel_timeout(client)
+	closesocket(client.socket)
 	switch client.state {
 	case .New, .Reading, .SendingFileResponseAndClosing:
 		client.state = .ClosedByServer
