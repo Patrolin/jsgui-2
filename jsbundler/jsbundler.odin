@@ -2,13 +2,14 @@
 // odin build jsbundler -default-to-nil-allocator -o:speed
 /* NOTE: odin adds 250 KiB to exe size, just for RTTI - we need a better language? */
 package main
+import "base:runtime"
 import "core:fmt"
 import "core:mem"
 import "core:strconv"
 import "lib"
 
 // globals
-serve_http := true
+serve_enabled := true
 serve_port: u16 = 3000
 serve_thread_count := 1
 
@@ -81,7 +82,7 @@ main :: proc() {
 			}
 			lib.exit_process()
 		} else if second_arg == "build" {
-			serve_http = false
+			serve_enabled = false
 		} else {
 			new_port, ok := strconv.parse_uint(second_arg, 10, nil)
 			if !ok || new_port > uint(max(u16)) {
@@ -91,22 +92,57 @@ main :: proc() {
 		}
 	}
 
-	if serve_http {
+	if serve_enabled {
 		ioring := lib.ioring_create()
-		watched_dir: lib.WatchedDir
-		lib.ioring_open_dir_for_watching(ioring, &watched_dir)
-		lib.ioring_create_watched_dir(ioring, &watched_dir)
-
-		server: lib.Server
-		lib.init_sockets()
-		// TODO: create server socket on existing ioring
-		//lib.create_server_socket(&server, serve_port, serve_thread_count)
-		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
-		for i in 0 ..< serve_thread_count {
-			lib.start_thread(serve_http_proc, &server)
+		watched_dir := lib.WatchedDir {
+			path = SRC_PATH,
 		}
+		lib.ioring_open_dir_for_watching(ioring, &watched_dir)
+		lib.ioring_watch_file_changes_async(ioring, &watched_dir)
+
+		server := lib.Server {
+			ioring    = ioring,
+			user_data = &watched_dir,
+		}
+		lib.init_sockets()
+		lib.create_server_socket(&server, serve_port)
+		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
+		for i in 0 ..< serve_thread_count - 1 {
+			// nocheckin lib.start_thread(serve_http_or_rebuild_proc, &server)
+		}
+		rebuild_index_file()
+		serve_http_or_rebuild(&server)
 	} else {
 		rebuild_index_file()
+	}
+}
+serve_http_or_rebuild_proc :: proc "system" (server: ^lib.Server) {
+	context = runtime.default_context()
+	when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+		context.allocator = shared_allocator
+		temp_buffer := lib.page_reserve(lib.GibiByte)
+		arena_allocator: lib.ArenaAllocator
+		context.temp_allocator = lib.arena_allocator(&arena_allocator, temp_buffer)
+	}
+	serve_http_or_rebuild(server)
+}
+serve_http_or_rebuild :: proc(server: ^lib.Server) {
+	watched_dir := (^lib.WatchedDir)(server.user_data)
+
+	lib.accept_client_async(server)
+	for {
+		free_all(context.temp_allocator)
+		event: lib.IoringEvent = ---
+		lib.ioring_wait_for_next_event(server.ioring, &event)
+
+		is_dir_event := rawptr(event.overlapped) == watched_dir
+		//fmt.printfln("is_dir_event: %v, event: %v", is_dir_event, event)
+		if is_dir_event {
+			lib.wait_for_writes_to_finish(watched_dir)
+			rebuild_index_file()
+		} else {
+			serve_http(server, &event)
+		}
 	}
 }
 rebuild_index_file :: proc() {

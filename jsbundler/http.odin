@@ -1,5 +1,4 @@
 package main
-import "base:runtime"
 import "core:fmt"
 import "lib"
 
@@ -8,30 +7,23 @@ GET_START :: "GET "
 HTTP_END :: "\r\n\r\n"
 
 // procs
-serve_http_proc :: proc "system" (data: rawptr) -> u32 {
-	context = runtime.default_context()
-	when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
-		context.allocator = shared_allocator
-		temp_buffer := lib.page_reserve(lib.GibiByte)
-		arena_allocator: lib.ArenaAllocator
-		context.temp_allocator = lib.arena_allocator(&arena_allocator, temp_buffer)
-	}
-
-	server := (^lib.Server)(data)
-	for {
-		free_all(context.temp_allocator)
-		client := lib.wait_for_next_socket_event(server)
-		defer lib.handle_socket_event(server, client)
-
-		if client.state == .Reading {
-			request := transmute(string)(client.async_rw_buffer[:client.async_rw_pos])
-			if len(request) < len(GET_START) {continue}
+serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
+	client := lib.handle_socket_event(server, event)
+	switch client.state {
+	case .New:
+		client.state = .Reading
+		lib.receive_client_data_async(client)
+		lib.accept_client_async(server)
+	case .Reading:
+		request := transmute(string)(client.async_rw_buffer[:client.async_rw_pos])
+		if len(request) >= len(GET_START) {
 			if !lib.starts_with(request, GET_START) {
 				lib.cancel_io_and_close_client(client)
 			} else if lib.ends_with(request, HTTP_END) {
+				// handle request
 				// TODO: handle favicons or whatever?
 				file_path := "index.html"
-				file, file_size, ok := lib.open_file_for_response(client, file_path)
+				file_size, ok := lib.open_file_for_response(client, file_path)
 				fmt.assertf(ok, "Failed to open file: '%v'", file_path)
 				// write http headers
 				content_type := "text/html"
@@ -41,7 +33,15 @@ serve_http_proc :: proc "system" (data: rawptr) -> u32 {
 					content_type,
 				)
 				lib.send_file_response_and_close_client(client, transmute([]byte)(header))
+				return
 			}
 		}
+		lib.receive_client_data_async(client)
+	case .SendingFileResponseAndClosing:
+	/* NOTE: handled by OS */
+	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
+		client.state = .ClosedByServer
+		if client.async_write_file != nil {lib.close_file(client.async_write_file)}
+		free(client)
 	}
 }

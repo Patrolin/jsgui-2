@@ -2,11 +2,14 @@ package lib
 import "core:fmt"
 
 WatchedDir :: struct {
-	/* NOTE: OVERLAPPED at top, so you can cast it to ^WatchedDir */
+	/* NOTE: OVERLAPPED must be at the top, so you can cast it to ^WatchedDir, and must not be moved */
 	overlapped:   OVERLAPPED,
 	path:         string,
 	handle:       DirHandle,
-	async_buffer: [4096 - 32 - 16 - 8]byte `fmt:"-"`,
+	async_buffer: [4096 -
+	32 -
+	16 -
+	8]byte `fmt:"-"`,
 }
 #assert(size_of(WatchedDir) == 4096)
 
@@ -30,7 +33,7 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 	return
 }
 /* NOTE: same caveats as walk_files() */
-ioring_create_watched_dir :: proc(ioring: Ioring, dir: ^WatchedDir) {
+ioring_watch_file_changes_async :: proc(ioring: Ioring, dir: ^WatchedDir) {
 	ok := ReadDirectoryChangesW(
 		dir.handle,
 		&dir.async_buffer[0],

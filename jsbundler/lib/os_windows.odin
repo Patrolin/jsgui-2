@@ -7,7 +7,7 @@ import "core:fmt"
 
 /* NOTE: Windows ships only on x64 */
 // common
-INVALID_HANDLE :: HANDLE(~uintptr(0))
+INVALID_HANDLE :: HANDLE(max(uintptr))
 INFINITE :: max(u32)
 
 CP_UTF8 :: 65001
@@ -104,13 +104,17 @@ tprint_wstring :: proc {
 	tprint_cwstr,
 	tprint_string16,
 }
-tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator) -> []u16 {
+tprint_string_as_wstring :: proc(
+	str: string,
+	allocator := context.temp_allocator,
+	loc := #caller_location,
+) -> []u16 {
 	str_len := len(str)
 	str_len_cint := CINT(str_len)
-	assert(int(str_len_cint) == str_len)
+	assert(int(str_len_cint) == str_len, loc = loc)
 
 	wlen := MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, raw_data(str), str_len_cint, nil, 0)
-	assert(wlen != 0)
+	assert(wlen != 0, loc = loc)
 	cwlen := wlen + 1
 	cwstr_buf := make([]u16, cwlen, allocator = allocator)
 
@@ -122,7 +126,7 @@ tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocato
 		&cwstr_buf[0],
 		cwlen,
 	)
-	assert(written_chars == wlen)
+	assert(written_chars == wlen, loc = loc)
 	return cwstr_buf[:cwlen]
 }
 

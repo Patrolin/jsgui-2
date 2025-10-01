@@ -104,6 +104,5 @@ flush_file :: proc(file: FileHandle) {
 	FlushFileBuffers(file)
 }
 close_file :: proc(file: FileHandle) {
-	flush_file(file)
 	CloseHandle(HANDLE(file))
 }
