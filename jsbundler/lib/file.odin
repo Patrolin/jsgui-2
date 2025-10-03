@@ -172,7 +172,7 @@ flush_file :: proc(file: FileHandle) {
 }
 close_file :: proc(file: FileHandle) {
 	when ODIN_OS == .Windows {
-		CloseHandle(HANDLE(file))
+		CloseHandle(Handle(file))
 	} else {
 		assert(false)
 	}

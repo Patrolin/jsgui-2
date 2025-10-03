@@ -9,9 +9,9 @@ import "core:strconv"
 import "lib"
 
 // globals
-serve_enabled := true
-serve_port: u16 = 3000
-serve_thread_count := 1
+global_serve_enabled := true
+global_serve_port: u16 = 3000
+global_serve_thread_count := 1
 
 // constants
 SRC_PATH :: "src" /* NOTE: FILES_TO_INIT needs hardcoded paths.. */
@@ -34,7 +34,7 @@ FILES_TO_INIT :: []FileToInit {
 print_help_and_exit :: proc() {
 	fmt.printfln(
 		"  jsbundler [port]  - serve at [port=%v] and rebuild when files change",
-		serve_port,
+		global_serve_port,
 	)
 	fmt.println("  jsbundler build   - build and exit")
 	fmt.println("  jsbundler help    - print this")
@@ -82,17 +82,17 @@ main :: proc() {
 			}
 			lib.exit_process()
 		} else if second_arg == "build" {
-			serve_enabled = false
+			global_serve_enabled = false
 		} else {
 			new_port, ok := strconv.parse_uint(second_arg, 10, nil)
 			if !ok || new_port > uint(max(u16)) {
 				print_help_and_exit()
 			}
-			serve_port = u16(new_port)
+			global_serve_port = u16(new_port)
 		}
 	}
 
-	if serve_enabled {
+	if global_serve_enabled {
 		ioring := lib.ioring_create()
 		watched_dir := lib.WatchedDir {
 			path = SRC_PATH,
@@ -105,10 +105,10 @@ main :: proc() {
 			user_data = &watched_dir,
 		}
 		lib.init_sockets()
-		lib.create_server_socket(&server, serve_port)
-		fmt.printfln("- Serving on http://localhost:%v/", serve_port)
-		for i in 0 ..< serve_thread_count - 1 {
-			// nocheckin lib.start_thread(serve_http_or_rebuild_proc, &server)
+		lib.create_server_socket(&server, global_serve_port)
+		fmt.printfln("- Serving on http://localhost:%v/", global_serve_port)
+		for i in 0 ..< global_serve_thread_count - 1 {
+			lib.start_thread(serve_http_or_rebuild_proc, &server)
 		}
 		rebuild_index_file()
 		serve_http_or_rebuild(&server)
@@ -116,7 +116,8 @@ main :: proc() {
 		rebuild_index_file()
 	}
 }
-serve_http_or_rebuild_proc :: proc "system" (server: ^lib.Server) {
+serve_http_or_rebuild_proc :: proc "system" (user_data: rawptr) -> (return_code: u32) {
+	server := (^lib.Server)(user_data)
 	context = runtime.default_context()
 	when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 		context.allocator = shared_allocator
@@ -125,6 +126,7 @@ serve_http_or_rebuild_proc :: proc "system" (server: ^lib.Server) {
 		context.temp_allocator = lib.arena_allocator(&arena_allocator, temp_buffer)
 	}
 	serve_http_or_rebuild(server)
+	return
 }
 serve_http_or_rebuild :: proc(server: ^lib.Server) {
 	watched_dir := (^lib.WatchedDir)(server.user_data)
@@ -135,7 +137,7 @@ serve_http_or_rebuild :: proc(server: ^lib.Server) {
 		event: lib.IoringEvent = ---
 		lib.ioring_wait_for_next_event(server.ioring, &event)
 
-		is_dir_event := rawptr(event.overlapped) == watched_dir
+		is_dir_event := rawptr(event.user_data) == watched_dir
 		//fmt.printfln("is_dir_event: %v, event: %v", is_dir_event, event)
 		if is_dir_event {
 			lib.wait_for_writes_to_finish(watched_dir)

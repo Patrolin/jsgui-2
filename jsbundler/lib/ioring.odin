@@ -6,13 +6,26 @@ IoringError :: enum {
 	IoCanceled,
 	ConnectionClosedByOtherParty,
 }
-Ioring :: IocpHandle
-IoringTimer :: TimerHandle
 IoringEvent :: struct {
-	bytes:      u32,
-	user_data:  rawptr,
-	overlapped: ^OVERLAPPED,
-	error:      IoringError,
+	bytes:   u32,
+	error:   IoringError,
+	using _: IoringEvent_OsFooter,
+}
+when ODIN_OS == .Windows {
+	Ioring :: IocpHandle
+	IoringTimer :: TimerHandle
+	IoringEvent_OsFooter :: struct {
+		user_data:      ^OVERLAPPED,
+		completion_key: rawptr,
+	}
+} else when ODIN_OS == .Linux {
+	Ioring :: IoringHandle
+	IoringTimer :: TimerHandle
+	IoringEvent_OsFooter :: struct {
+		user_data: rawptr,
+	}
+} else {
+	#assert(false)
 }
 
 ioring_create :: proc() -> (ioring: Ioring) {
@@ -65,8 +78,8 @@ ioring_wait_for_next_event :: proc(ioring: Ioring, event: ^IoringEvent) {
 		ok := GetQueuedCompletionStatus(
 			ioring,
 			&event.bytes,
+			&event.completion_key,
 			&event.user_data,
-			&event.overlapped,
 			INFINITE,
 		)
 		event.error = .None

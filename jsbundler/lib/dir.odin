@@ -34,7 +34,7 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 		)
 		fmt.assertf(dir.handle != nil, "Failed to open directory for watching: '%v'", dir.path)
 		// associate with ioring
-		assert(CreateIoCompletionPort(HANDLE(dir.handle), ioring, 0, 0) != nil)
+		assert(CreateIoCompletionPort(Handle(dir.handle), ioring, 0, 0) != nil)
 	} else {
 		assert(false)
 	}

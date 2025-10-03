@@ -74,7 +74,7 @@ init_sockets :: proc() {
 		WINSOCK_MAJOR_VERSION :: 2
 		WINSOCK_MINOR_VERSION :: 2
 		fmt.assertf(
-			WSAStartup(WINSOCK_MAJOR_VERSION | (WINSOCK_MINOR_VERSION << 8), &_winsock) == 0,
+			WSAStartup(WINSOCK_MAJOR_VERSION | (WINSOCK_MINOR_VERSION << 8), &global_winsock) == 0,
 			"Failed to initialize Winsock %v.%v",
 			WINSOCK_MAJOR_VERSION,
 			WINSOCK_MINOR_VERSION,
@@ -101,7 +101,7 @@ create_server_socket :: proc(server: ^Server, port: u16) {
 
 	when ODIN_OS == .Windows {
 		fmt.assertf(
-			CreateIoCompletionPort(HANDLE(server.socket), server.ioring, 0, 0) == server.ioring,
+			CreateIoCompletionPort(Handle(server.socket), server.ioring, 0, 0) == server.ioring,
 			"Failed to listen to the server socket via IOCP",
 		)
 
@@ -267,7 +267,7 @@ cancel_timeout :: proc "system" (client: ^Client) {
 }
 cancel_io_and_close_client :: proc "system" (client: ^Client) {
 	when ODIN_OS == .Windows {
-		CancelIoEx(HANDLE(client.socket), nil)
+		CancelIoEx(Handle(client.socket), nil)
 		close_client(client)
 	} else {
 		assert(false)
@@ -283,7 +283,7 @@ close_client :: proc "system" (client: ^Client) {
 	}
 }
 handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^Client) {
-	client = (^Client)(event.overlapped)
+	client = (^Client)(event.user_data)
 	switch event.error {
 	case .None:
 	case .IoCanceled:
@@ -297,7 +297,7 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 	case .New:
 		// accept a new connection
 		when ODIN_OS == .Windows {
-			result := CreateIoCompletionPort(HANDLE(client.socket), server.ioring, 0, 0)
+			result := CreateIoCompletionPort(Handle(client.socket), server.ioring, 0, 0)
 			fmt.assertf(result == server.ioring, "Failed to listen to the client socket with IOCP")
 		} else {
 			assert(false)
@@ -313,11 +313,12 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 			0,
 			"Failed to set client params",
 		)
+		/* NOTE: IOCP is badly designed, see ioring_set_timer_async() */
 		on_timeout :: proc "system" (user_ptr: rawptr, _TimerOrWaitFired: BOOL) {
 			client := (^Client)(user_ptr)
 			PostQueuedCompletionStatus(client.ioring, 0, 1, &client.overlapped)
 		}
-	// nocheckin ioring_set_timer_async(server.ioring, &client.timeout_timer, 1000, client, on_timeout)
+		ioring_set_timer_async(server.ioring, &client.timeout_timer, 1000, client, on_timeout)
 	/* TODO: parse address via GetAcceptExSockaddrs()? */
 	case .Reading:
 		if event.bytes == 0 {

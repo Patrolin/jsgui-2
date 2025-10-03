@@ -2,14 +2,8 @@ package lib
 import "base:intrinsics"
 import "core:strings"
 
-// constants
-@(private)
-PRIME_RABIN_KARP: u32 : 16777619
-
-// types
 StringBuilder :: strings.Builder
 
-// procs
 to_string :: #force_inline proc(sb: StringBuilder) -> string {
 	return strings.to_string(sb)
 }
@@ -20,6 +14,8 @@ ends_with :: proc(str, suffix: string) -> bool {
 	return len(str) >= len(suffix) && str[len(str) - len(suffix):] == suffix
 }
 
+@(private)
+PRIME_RABIN_KARP: u32 : 16777619
 /* returns the first byte offset of the first `substring` in the `str`, or `len(str)` when not found. */
 @(private)
 hash_rabin_karp :: #force_inline proc "contextless" (hash, value: u32) -> u32 {
