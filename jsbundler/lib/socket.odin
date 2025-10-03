@@ -315,8 +315,12 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 		)
 		/* NOTE: IOCP is badly designed, see ioring_set_timer_async() */
 		on_timeout :: proc "system" (user_ptr: rawptr, _TimerOrWaitFired: BOOL) {
-			client := (^Client)(user_ptr)
-			PostQueuedCompletionStatus(client.ioring, 0, 1, &client.overlapped)
+			when ODIN_OS == .Windows {
+				client := (^Client)(user_ptr)
+				PostQueuedCompletionStatus(client.ioring, 0, 1, &client.overlapped)
+			} else {
+				//assert(false)
+			}
 		}
 		ioring_set_timer_async(server.ioring, &client.timeout_timer, 1000, client, on_timeout)
 	/* TODO: parse address via GetAcceptExSockaddrs()? */

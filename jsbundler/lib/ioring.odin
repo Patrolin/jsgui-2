@@ -34,7 +34,12 @@ ioring_create :: proc() -> (ioring: Ioring) {
 		ioring = CreateIoCompletionPort(INVALID_HANDLE, nil, 0, 0)
 		fmt.assertf(ioring != nil, "Failed to create ioring")
 	} else {
-		/* TODO: io_uring + io_uring_prep_accept() on linux */
+		/* TODO: io_uring_queue_init()
+			add: io_uring_get_sqe() + io_uring_XXX() + io_uring_sqe_set_data() + io_uring_submit() on linux
+			wait_for_result: io_uring_wait_cqe() + io_uring_cqe_get_data()
+			get_result: io_uring_cqe_get_data()
+			sockets via io_uring_prep_accept(), io_uring_prep_recv()
+		*/
 		assert(false)
 	}
 	return
