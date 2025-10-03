@@ -64,6 +64,8 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Linux {
 	Server_OsFooter :: struct {}
 	Client_OsHeader :: struct {}
+} else {
+	//#assert(false)
 }
 
 // NOTE: call this once per process
@@ -120,6 +122,8 @@ create_server_socket :: proc(server: ^Server, port: u16) {
 			0,
 			"Failed to setup async accept",
 		)
+	} else {
+		assert(false)
 	}
 	return
 }

@@ -15,8 +15,10 @@ init_page_fault_handler :: #force_inline proc "contextless" () {
 			return EXCEPTION_EXECUTE_HANDLER
 		}
 		SetUnhandledExceptionFilter(_page_fault_exception_handler)
-	} else {
+	} else when ODIN_OS == .Linux {
 		/* NOTE: linux has a default page fault handler */
+	} else {
+		assert(false)
 	}
 }
 page_reserve :: proc(size: Size) -> []byte {

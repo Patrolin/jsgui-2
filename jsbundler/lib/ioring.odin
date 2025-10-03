@@ -21,6 +21,7 @@ ioring_create :: proc() -> (ioring: Ioring) {
 		ioring = CreateIoCompletionPort(INVALID_HANDLE, nil, 0, 0)
 		fmt.assertf(ioring != nil, "Failed to create ioring")
 	} else {
+		/* TODO: io_uring + io_uring_prep_accept() on linux */
 		assert(false)
 	}
 	return
