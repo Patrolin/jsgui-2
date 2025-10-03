@@ -2,11 +2,9 @@ package main
 import "core:fmt"
 import "lib"
 
-// constants
 GET_START :: "GET "
 HTTP_END :: "\r\n\r\n"
 
-// procs
 serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 	client := lib.handle_socket_event(server, event)
 	switch client.state {

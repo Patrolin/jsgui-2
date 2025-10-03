@@ -154,7 +154,7 @@ exit :: #force_inline proc(exit_code: CINT) {
 }
 
 // file
-AT_FDCWD :: transmute(FileHandle)(int(-100))
+AT_FDCWD :: transmute(DirHandle)(int(-100))
 O_RDONLY :: 0
 O_DIRECTORY :: 0
 
@@ -174,9 +174,9 @@ mkdir :: #force_inline proc(dir_path: cstring, mode: FileMode = 0o755) -> int #n
 	return int(result)
 }
 renameat2 :: #force_inline proc(
-	src_file: FileHandle,
+	src_file: DirHandle,
 	src_path: cstring,
-	dest_file: FileHandle,
+	dest_file: DirHandle,
 	dest_path: cstring,
 	flags: CUINT = 0,
 ) -> int {
