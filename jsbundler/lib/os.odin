@@ -431,6 +431,103 @@ when ODIN_OS == .Windows {
 		DeleteTimerQueueTimer :: proc(timer_queue: TimerQueueHandle, timer: TimerHandle, event: Handle) -> BOOL ---
 		CancelIoEx :: proc(handle: Handle, overlapped: ^OVERLAPPED) -> BOOL ---
 	}
+} else when ODIN_OS == .Linux {
+	// types
+	io_uring_sqe :: struct {
+		/* TODO */
+		buffer: [64]byte,
+	}
+	#assert(size_of(io_uring_sqe) == 64)
+	io_uring_sq :: struct {
+		khead:         ^CUINT,
+		ktail:         ^CUINT,
+		/* deprecated: use `ring_mask` instead of `*kring_mask` */
+		kring_mask:    ^CUINT,
+		/* deprecated: use `ring_entries` instead of `*kring_entries` */
+		kring_entries: ^CUINT,
+		kflags:        ^CUINT,
+		kdropped:      ^CUINT,
+		array:         ^CUINT,
+		sqes:          [^]io_uring_sqe,
+		sqe_head:      CUINT,
+		sqe_tail:      CUINT,
+		ring_sz:       uintptr,
+		ring_ptr:      rawptr,
+		ring_mask:     CUINT,
+		ring_entries:  CUINT,
+		_pad:          [2]CUINT,
+	}
+	#assert(size_of(io_uring_sq) == 104)
+
+	io_uring_cqe :: struct {
+		/* sqe->data submission passed back */
+		user_data: u64,
+		/* result code for this event */
+		res:       i32,
+		flags:     u32,
+	}
+	#assert(size_of(io_uring_cqe) == 16)
+	io_uring_cq :: struct {
+		khead:         ^CUINT,
+		ktail:         ^CUINT,
+		/* deprecated: use `ring_mask` instead of `*kring_mask` */
+		kring_mask:    ^CUINT,
+		/* deprecated: use `ring_entries` instead of `*kring_entries` */
+		kring_entries: ^CUINT,
+		kflags:        ^CUINT,
+		koverflow:     ^CUINT,
+		cqes:          [^]io_uring_cqe,
+		ring_sz:       uintptr,
+		ring_ptr:      rawptr,
+		ring_mask:     CUINT,
+		ring_entries:  CUINT,
+		_pad:          [2]CUINT,
+	}
+	#assert(size_of(io_uring_cq) == 88)
+
+	io_uring :: struct {
+		sq:            io_uring_sq,
+		cq:            io_uring_cq,
+		flags:         CUINT,
+		ring_fd:       CINT,
+		features:      CUINT,
+		enter_ring_fd: CINT,
+		int_flags:     u8,
+		_pad:          [3]u8,
+		_pad2:         CUINT,
+	}
+	#assert(size_of(io_uring) == 216)
+
+	// procs
+	io_uring_get_sqe :: proc(ioring: ^io_uring) -> io_uring_sqe {
+		sq := &ioring.sq
+		head: CUINT
+		next := sq.sqe_tail + 1
+		/* TODO: do we want IORING_SETUP_SQPOLL or not? */
+
+		/*
+		struct io_uring_sq *sq = &ring->sq;
+		unsigned int head, next = sq->sqe_tail + 1;
+		int shift = 0;
+
+		if (ring->flags & IORING_SETUP_SQE128)
+			shift = 1;
+		if (!(ring->flags & IORING_SETUP_SQPOLL))
+			head = IO_URING_READ_ONCE(*sq->khead);
+		else
+			head = io_uring_smp_load_acquire(sq->khead);
+
+		if (next - head <= sq->ring_entries) {
+			struct io_uring_sqe *sqe;
+
+			sqe = &sq->sqes[(sq->sqe_tail & sq->ring_mask) << shift];
+			sq->sqe_tail = next;
+			return sqe;
+		}
+
+		return NULL;
+		*/
+	}
 } else {
 	//#assert(false)
 }
