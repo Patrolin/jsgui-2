@@ -82,7 +82,11 @@ walk_files :: proc(
 		} else {
 			assert(int(dir) == ERR_NONE)
 			dir_entries_buffer: [4096]byte
-			bytes_written := getdents64(dir, &dir_entries_buffer[0], len(dir_entries_buffer))
+			bytes_written := get_directory_entries_64b(
+				dir,
+				&dir_entries_buffer[0],
+				len(dir_entries_buffer),
+			)
 			assert(bytes_written >= 0)
 			if bytes_written == 0 {return}
 

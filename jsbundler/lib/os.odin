@@ -501,7 +501,6 @@ when ODIN_OS == .Windows {
 	FileMode :: CUINT
 
 	// flags
-	INVALID_HANDLE := max(FileHandle)
 	AT_FDCWD :: transmute(DirHandle)(i32(-100))
 	O_RDONLY :: 0
 	O_DIRECTORY :: 0

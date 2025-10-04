@@ -15,7 +15,8 @@ when ODIN_OS == .Windows {
 } else {
 	//#assert(false)
 }
-#assert(size_of(WatchedDir) == 4096)
+/* TODO: put a minimum size for the buffer and let it be sized by the allocator */
+#assert(size_of(WatchedDir) <= 4096)
 
 ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 	when ODIN_OS == .Windows {
