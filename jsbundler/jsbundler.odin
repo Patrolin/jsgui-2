@@ -8,10 +8,12 @@ import "core:mem"
 import "core:strconv"
 import "lib"
 
+// params
+SERVE_THREAD_COUNT :: 1
+
 // globals
 global_serve_enabled := true
-global_serve_port: u16 = 3000
-global_serve_thread_count := 1
+global_serve_port := u16(3000)
 
 // constants
 SRC_PATH :: "src" /* NOTE: FILES_TO_INIT needs hardcoded paths.. */
@@ -107,8 +109,10 @@ main :: proc() {
 		lib.init_sockets()
 		lib.create_server_socket(&server, global_serve_port)
 		fmt.printfln("- Serving on http://localhost:%v/", global_serve_port)
-		for i in 0 ..< global_serve_thread_count - 1 {
-			lib.start_thread(serve_http_or_rebuild_proc, &server)
+		when SERVE_THREAD_COUNT > 1 {
+			for i in 0 ..< SERVE_THREAD_COUNT - 1 {
+				lib.start_thread(serve_http_or_rebuild_proc, &server)
+			}
 		}
 		rebuild_index_file()
 		serve_http_or_rebuild(&server)

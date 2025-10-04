@@ -193,9 +193,10 @@ receive_client_data_async :: proc(client: ^Client) {
 	// TODO: send the response with WSASend(), but then we can't receive data (unless you allocate more overlappeds?)
 } */
 open_file_for_response :: proc(client: ^Client, file_path: string) -> (file_size: int, ok: bool) {
+	file := FileHandle(INVALID_HANDLE)
 	when ODIN_OS == .Windows {
 		wfile_path := &tprint_string_as_wstring(file_path, allocator = context.allocator)[0]
-		file := FileHandle(
+		file = FileHandle(
 			CreateFileW(
 				wfile_path,
 				GENERIC_READ,
@@ -270,7 +271,7 @@ cancel_io_and_close_client :: proc "system" (client: ^Client) {
 		CancelIoEx(Handle(client.socket), nil)
 		close_client(client)
 	} else {
-		assert(false)
+		#assert(false)
 	}
 }
 close_client :: proc "system" (client: ^Client) {
@@ -314,7 +315,7 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 			"Failed to set client params",
 		)
 		/* NOTE: IOCP is badly designed, see ioring_set_timer_async() */
-		on_timeout :: proc "system" (user_ptr: rawptr, _TimerOrWaitFired: BOOL) {
+		on_timeout :: proc "system" (user_ptr: rawptr, _TimerOrWaitFired: b32) {
 			when ODIN_OS == .Windows {
 				client := (^Client)(user_ptr)
 				PostQueuedCompletionStatus(client.ioring, 0, 1, &client.overlapped)

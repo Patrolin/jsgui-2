@@ -2,12 +2,12 @@ package lib
 import "core:fmt"
 
 when ODIN_OS == .Windows {
-	ThreadProc :: THREAD_START_ROUTINE
 	ThreadInfo :: struct {
 		id:     ThreadId,
 		handle: ThreadHandle,
 	}
 } else {
+	ThreadInfo :: struct {}
 	//#assert(false)
 }
 
