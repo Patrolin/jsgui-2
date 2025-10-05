@@ -286,6 +286,9 @@ when ODIN_OS == .Windows {
 	ERR_HWPOISON :: int(-133)
 
 	// procs
+	close_handle :: #force_inline proc "system" (handle: Handle) -> int {
+		return int(intrinsics.syscall(linux.SYS_close, uintptr(handle)))
+	}
 	copy_to_cstring :: proc(str: string, cbuffer: []byte) {
 		assert(len(str) + 1 < len(cbuffer))
 		copy(transmute([]byte)(str), cbuffer)
@@ -305,7 +308,7 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	// procs
-	exit :: #force_inline proc(exit_code: CINT) {
+	exit :: #force_inline proc "system" (exit_code: CINT) {
 		intrinsics.syscall(linux.SYS_exit, uintptr(exit_code))
 	}
 } else {
@@ -373,7 +376,7 @@ when ODIN_OS == .Windows {
 	MAP_ANONYMOUS :: 0x20
 
 	// procs
-	mmap :: #force_inline proc(
+	mmap :: #force_inline proc "system" (
 		addr: rawptr,
 		size: Size,
 		prot, flags: CINT,
@@ -433,100 +436,98 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	// types
-	io_uring_sqe :: struct {
-		/* TODO */
-		buffer: [64]byte,
+	EpollHandle :: distinct Handle
+	EpollEvent :: struct {
+		events: u32,
+		data:   struct #raw_union {
+			rawptr: rawptr,
+			u64:    u64,
+		},
 	}
-	#assert(size_of(io_uring_sqe) == 64)
-	io_uring_sq :: struct {
-		khead:         ^CUINT,
-		ktail:         ^CUINT,
-		/* deprecated: use `ring_mask` instead of `*kring_mask` */
-		kring_mask:    ^CUINT,
-		/* deprecated: use `ring_entries` instead of `*kring_entries` */
-		kring_entries: ^CUINT,
-		kflags:        ^CUINT,
-		kdropped:      ^CUINT,
-		array:         ^CUINT,
-		sqes:          [^]io_uring_sqe,
-		sqe_head:      CUINT,
-		sqe_tail:      CUINT,
-		ring_sz:       uintptr,
-		ring_ptr:      rawptr,
-		ring_mask:     CUINT,
-		ring_entries:  CUINT,
-		_pad:          [2]CUINT,
+	TimerHandle :: distinct Handle
+	TimeSpec64 :: struct {
+		tv_sec:  i64,
+		tv_nsec: i64,
 	}
-	#assert(size_of(io_uring_sq) == 104)
+	TimerOptions64 :: struct {
+		it_interval: TimeSpec64,
+		it_value:    TimeSpec64,
+	}
 
-	io_uring_cqe :: struct {
-		/* sqe->data submission passed back */
-		user_data: u64,
-		/* result code for this event */
-		res:       i32,
-		flags:     u32,
+	// flags
+	EpollOp :: enum {
+		EPOLL_CTL_ADD = 1,
+		EPOLL_CTL_DEL = 2,
+		EPOLL_CTL_MOD = 3,
 	}
-	#assert(size_of(io_uring_cqe) == 16)
-	io_uring_cq :: struct {
-		khead:         ^CUINT,
-		ktail:         ^CUINT,
-		/* deprecated: use `ring_mask` instead of `*kring_mask` */
-		kring_mask:    ^CUINT,
-		/* deprecated: use `ring_entries` instead of `*kring_entries` */
-		kring_entries: ^CUINT,
-		kflags:        ^CUINT,
-		koverflow:     ^CUINT,
-		cqes:          [^]io_uring_cqe,
-		ring_sz:       uintptr,
-		ring_ptr:      rawptr,
-		ring_mask:     CUINT,
-		ring_entries:  CUINT,
-		_pad:          [2]CUINT,
+	EPOLLIN :: 1
+	ClockType :: enum {
+		CLOCK_REALTIME  = 0,
+		CLOCK_MONOTONIC = 1,
 	}
-	#assert(size_of(io_uring_cq) == 88)
-
-	io_uring :: struct {
-		sq:            io_uring_sq,
-		cq:            io_uring_cq,
-		flags:         CUINT,
-		ring_fd:       CINT,
-		features:      CUINT,
-		enter_ring_fd: CINT,
-		int_flags:     u8,
-		_pad:          [3]u8,
-		_pad2:         CUINT,
-	}
-	#assert(size_of(io_uring) == 216)
 
 	// procs
-	io_uring_get_sqe :: proc(ioring: ^io_uring) -> io_uring_sqe {
-		sq := &ioring.sq
-		head: CUINT
-		next := sq.sqe_tail + 1
-		/* TODO: do we want IORING_SETUP_SQPOLL or not? */
-
-		/*
-		struct io_uring_sq *sq = &ring->sq;
-		unsigned int head, next = sq->sqe_tail + 1;
-		int shift = 0;
-
-		if (ring->flags & IORING_SETUP_SQE128)
-			shift = 1;
-		if (!(ring->flags & IORING_SETUP_SQPOLL))
-			head = IO_URING_READ_ONCE(*sq->khead);
-		else
-			head = io_uring_smp_load_acquire(sq->khead);
-
-		if (next - head <= sq->ring_entries) {
-			struct io_uring_sqe *sqe;
-
-			sqe = &sq->sqes[(sq->sqe_tail & sq->ring_mask) << shift];
-			sq->sqe_tail = next;
-			return sqe;
+	epoll_create1 :: #force_inline proc "system" (flags: CINT) -> EpollHandle {
+		result := intrinsics.syscall(linux.SYS_epoll_create1)
+		return EpollHandle(result)
+	}
+	epoll_ctl :: #force_inline proc "system" (
+		epoll: EpollHandle,
+		op: CINT,
+		fd: FileHandle,
+		event: ^EpollEvent,
+	) -> int {
+		return int(
+			intrinsics.syscall(
+				linux.SYS_epoll_ctl,
+				uintptr(epoll),
+				uintptr(op),
+				uintptr(fd),
+				uintptr(event),
+			),
+		)
+	}
+	epoll_wait :: #force_inline proc "system" (
+		epoll: EpollHandle,
+		events: [^]EpollEvent,
+		events_count: CINT,
+		timeout := max(CINT),
+	) -> int {
+		return int(
+			intrinsics.syscall(
+				linux.SYS_epoll_wait,
+				uintptr(epoll),
+				uintptr(events),
+				uintptr(events_count),
+				uintptr(timeout),
+			),
+		)
+	}
+	timerfd_create :: #force_inline proc "system" (type: ClockType, flags: CINT) -> TimerHandle {
+		return TimerHandle(
+			intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(flags)),
+		)
+	}
+	timerfd_settime64 :: #force_inline proc "system" (
+		timer: TimerHandle,
+		flags: CINT,
+		options: ^TimerOptions64,
+		old_options: ^TimerOptions64 = nil,
+	) -> int {
+		when IS_64BIT {
+			syscall_id := linux.SYS_timerfd_settime
+		} else {
+			syscall_id := linux.SYS_timerfd_settime64
 		}
-
-		return NULL;
-		*/
+		return int(
+			intrinsics.syscall(
+				syscall_id,
+				uintptr(timer),
+				uintptr(flags),
+				uintptr(options),
+				uintptr(old_options),
+			),
+		)
 	}
 } else {
 	//#assert(false)
@@ -593,9 +594,16 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	// types
-	DirHandle :: distinct u32
-	FileHandle :: distinct u32
+	DirHandle :: distinct Handle
+	FileHandle :: distinct Handle
 	FileMode :: CUINT
+	Dirent64 :: struct {
+		inode:      i64,
+		_internal:  i64,
+		size:       CUSHORT,
+		type:       byte,
+		cfile_name: [1]byte,
+	}
 
 	// flags
 	AT_FDCWD :: transmute(DirHandle)(i32(-100))
@@ -627,14 +635,31 @@ when ODIN_OS == .Windows {
 		)
 		return int(result)
 	}
-	open :: #force_inline proc(path: cstring, flags: CINT, mode: FileMode = 0o755) -> uintptr {
+	get_directory_entries_64b :: #force_inline proc "system" (
+		file: DirHandle,
+		buffer: [^]byte,
+		buffer_size: int,
+	) -> int {
+		result := intrinsics.syscall(
+			linux.SYS_getdents64,
+			uintptr(file),
+			uintptr(buffer),
+			uintptr(buffer_size),
+		)
+		return int(result)
+	}
+	open :: #force_inline proc "system" (
+		path: cstring,
+		flags: CINT,
+		mode: FileMode = 0o755,
+	) -> Handle {
 		result := intrinsics.syscall(
 			linux.SYS_open,
 			transmute(uintptr)(path),
 			uintptr(flags),
 			uintptr(mode),
 		)
-		return result
+		return Handle(result)
 	}
 } else {
 	//#assert(false)
@@ -683,25 +708,44 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	// types
-	Dirent64 :: struct {
-		inode:      i64,
-		_internal:  i64,
-		size:       CUSHORT,
-		type:       byte,
-		cfile_name: [1]byte,
+	FanotifyHandle :: distinct Handle
+
+	// flags
+	FanotifyClass :: enum {
+		FAN_CLASS_NOTIF = 0x0,
 	}
+	FAN_NONBLOCK :: 0x2
+	FAN_MARK_ADD :: 0x01
+	FAN_MARK_REMOVE :: 0x02
+	FAN_MARK_MOUNT :: 0x10
+	FAN_CLOSE_WRITE :: 0x8
 
 	// procs
-	get_directory_entries_64b :: #force_inline proc(
-		file: DirHandle,
-		buffer: [^]byte,
-		buffer_size: int,
+	fanotify_init :: #force_inline proc "system" (
+		init_flags: CUINT,
+		event_flags: CUINT,
+	) -> FanotifyHandle {
+		result := intrinsics.syscall(
+			linux.SYS_fanotify_init,
+			uintptr(init_flags),
+			uintptr(event_flags),
+		)
+		return FanotifyHandle(result)
+	}
+	fanotify_mark :: #force_inline proc "system" (
+		fanotify: FanotifyHandle,
+		mark_flags: CUINT,
+		mask: u64,
+		dir: DirHandle,
+		path: cstring,
 	) -> int {
 		result := intrinsics.syscall(
-			linux.SYS_getdents64,
-			uintptr(file),
-			uintptr(buffer),
-			uintptr(buffer_size),
+			linux.SYS_fanotify_mark,
+			uintptr(fanotify),
+			uintptr(mark_flags),
+			uintptr(mask),
+			uintptr(dir),
+			transmute(uintptr)(path),
 		)
 		return int(result)
 	}
@@ -710,18 +754,23 @@ when ODIN_OS == .Windows {
 }
 
 // socket
+SOMAXCONN :: max(CINT) /* NOTE: for some reason it's not max(CUINT)... */
+SOL_SOCKET :: CINT(max(u16)) /* NOTE: CINT used to be 16b... */
+SO_UPDATE_ACCEPT_CONTEXT: CINT : 0x700B
+INVALID_SOCKET :: max(SocketHandle)
+
 when ODIN_OS == .Windows {
 	// globals
 	global_winsock: WinsockData
 
 	// types
+	SocketHandle :: distinct uintptr
 	GUID :: struct {
 		Data1: DWORD,
 		Data2: WORD,
 		Data3: WORD,
 		Data4: [8]BYTE,
 	}
-	SOCKET :: distinct uintptr
 	WSABUF :: struct {
 		len:    CULONG,
 		buffer: [^]byte,
@@ -736,8 +785,8 @@ when ODIN_OS == .Windows {
 		szSystemStatus: [WSASYS_STATUS_LEN + 1]byte,
 	}
 	ACCEPT_EX :: proc(
-		sListenSocket: SOCKET,
-		sAcceptSocket: SOCKET,
+		sListenSocket: SocketHandle,
+		sAcceptSocket: SocketHandle,
 		lpOutputBuffer: rawptr,
 		dwReceiveDataLength: DWORD,
 		dwLocalAddressLength: DWORD,
@@ -758,11 +807,6 @@ when ODIN_OS == .Windows {
 	// flags
 	WSADESCRIPTION_LEN :: 256
 	WSASYS_STATUS_LEN :: 128
-	SOMAXCONN :: max(CINT) /* NOTE: for some reason it's not max(CUINT)... */
-	INVALID_SOCKET :: max(SOCKET)
-
-	SOL_SOCKET :: CINT(max(u16)) /* NOTE: CINT used to be 16b... */
-	SO_UPDATE_ACCEPT_CONTEXT: CINT : 0x700B
 
 	IOC_OUT :: 0x40000000
 	IOC_IN :: 0x80000000
@@ -803,15 +847,15 @@ when ODIN_OS == .Windows {
 	@(default_calling_convention = "c")
 	foreign winsock_lib {
 		WSAStartup :: proc(requested_version: WORD, winsock: ^WinsockData) -> CINT ---
-		WSAIoctl :: proc(socket: SOCKET, control_code: DWORD, in_buf: rawptr, in_len: DWORD, out_buf: rawptr, out_len: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
-		WSASocketW :: proc(address_type, connection_type, protocol: CINT, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: DWORD) -> SOCKET ---
-		WSARecv :: proc(socket: SOCKET, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
+		WSAIoctl :: proc(socket: SocketHandle, control_code: DWORD, in_buf: rawptr, in_len: DWORD, out_buf: rawptr, out_len: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
+		WSASocketW :: proc(address_type, connection_type, protocol: CINT, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: DWORD) -> SocketHandle ---
+		WSARecv :: proc(socket: SocketHandle, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
 
-		socket :: proc(address_type, connection_type, protocol: CINT) -> SOCKET ---
-		bind :: proc(socket: SOCKET, address: ^SocketAddress, address_size: CINT) -> CINT ---
-		listen :: proc(socket: SOCKET, max_connections: CINT) -> CINT ---
-		closesocket :: proc(socket: SOCKET) -> CINT ---
-		setsockopt :: proc(socket: SOCKET, level: CINT, optname: CINT, optval: rawptr, optlen: CINT) -> CINT ---
+		socket :: proc(address_type, connection_type, protocol: CINT) -> SocketHandle ---
+		bind :: proc(socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> CINT ---
+		listen :: proc(socket: SocketHandle, max_connections: CINT) -> CINT ---
+		closesocket :: proc(socket: SocketHandle) -> CINT ---
+		setsockopt :: proc(socket: SocketHandle, level: CINT, optname: CINT, optval: rawptr, optlen: CINT) -> CINT ---
 
 		WSAGetLastError :: proc() -> DWORD ---
 	}
@@ -832,7 +876,44 @@ when ODIN_OS == .Windows {
 	foreign import winsock_ext_lib "system:Mswsock.lib"
 	@(default_calling_convention = "c")
 	foreign winsock_ext_lib {
-		TransmitFile :: proc(socket: Socket, file: FileHandle, bytes_to_write, bytes_per_send: DWORD, overlapped: ^OVERLAPPED, transmit_buffers: ^TRANSMIT_FILE_BUFFERS, flags: DWORD) -> BOOL ---
+		TransmitFile :: proc(socket: SocketHandle, file: FileHandle, bytes_to_write, bytes_per_send: DWORD, overlapped: ^OVERLAPPED, transmit_buffers: ^TRANSMIT_FILE_BUFFERS, flags: DWORD) -> BOOL ---
+	}
+} else when ODIN_OS == .Linux {
+	// types
+	SocketHandle :: distinct CINT
+
+	// procs
+	socket :: #force_inline proc "system" (
+		address_type, connection_type, protocol: CINT,
+	) -> SocketHandle {
+		assert_contextless(false)
+		return 0
+	}
+	bind :: #force_inline proc "system" (
+		socket: SocketHandle,
+		address: ^SocketAddress,
+		address_size: CINT,
+	) -> CINT {
+		assert_contextless(false)
+		return 0
+	}
+	listen :: #force_inline proc "system" (socket: SocketHandle, max_connections: CINT) -> CINT {
+		assert_contextless(false)
+		return 0
+	}
+	closesocket :: #force_inline proc "system" (socket: SocketHandle) -> CINT {
+		assert_contextless(false)
+		return 0
+	}
+	setsockopt :: #force_inline proc "system" (
+		socket: SocketHandle,
+		level: CINT,
+		optname: CINT,
+		optval: rawptr,
+		optlen: CINT,
+	) -> CINT {
+		assert_contextless(false)
+		return 0
 	}
 } else {
 	//#assert(false)

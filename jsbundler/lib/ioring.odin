@@ -19,7 +19,7 @@ when ODIN_OS == .Windows {
 		completion_key: rawptr,
 	}
 } else when ODIN_OS == .Linux {
-	Ioring :: IoringHandle
+	Ioring :: EpollHandle
 	IoringTimer :: TimerHandle
 	IoringEvent_OsFooter :: struct {
 		user_data: rawptr,
@@ -33,13 +33,10 @@ ioring_create :: proc() -> (ioring: Ioring) {
 		/* NOTE: allow up to `logical_cores` threads */
 		ioring = CreateIoCompletionPort(INVALID_HANDLE, nil, 0, 0)
 		fmt.assertf(ioring != nil, "Failed to create ioring")
+	} else when ODIN_OS == .Linux {
+		ioring = epoll_create1(0)
+		fmt.assertf(ioring >= 0, "Failed to create ioring, err: %v", ioring)
 	} else {
-		/* TODO: io_uring_queue_init()
-			add: io_uring_get_sqe() + io_uring_XXX() + io_uring_sqe_set_data() + io_uring_submit() on linux
-			wait_for_result: io_uring_wait_cqe() + io_uring_cqe_get_data()
-			get_result: io_uring_cqe_get_data()
-			sockets via io_uring_prep_accept(), io_uring_prep_recv()
-		*/
 		assert(false)
 	}
 	return
@@ -54,7 +51,7 @@ ioring_set_timer_async :: proc(
 	ioring_cancel_timer(ioring, timer)
 	when ODIN_OS == .Windows {
 		ms_u32 := u32(ms)
-		assert(int(ms_u32) == ms)
+		fmt.assertf(int(ms_u32) == ms, "Invalid downcast")
 		/* NOTE: this will set a timer on a system-created threadpool, but there's no easy way to just send a timer to an IOCP on windows... */
 		ok := CreateTimerQueueTimer(
 			timer,
@@ -65,18 +62,27 @@ ioring_set_timer_async :: proc(
 			0,
 			WT_EXECUTEONLYONCE,
 		)
+		fmt.assertf(bool(ok), "Failed to create a timer")
+	} else when ODIN_OS == .Linux {
+		timer^ = timerfd_create(.CLOCK_MONOTONIC, 0)
+		timer_options := TimerOptions64 {
+			it_value = {tv_sec = 1},
+		}
+		timerfd_settime64(timer^, 0, &timer_options)
+		fmt.assertf(Handle(timer^) != INVALID_HANDLE, "Failed to create a timer")
 	} else {
 		assert(false)
 	}
-	assert(bool(ok))
 }
 ioring_cancel_timer :: proc "system" (ioring: Ioring, timer: ^IoringTimer) {
 	when ODIN_OS == .Windows {
 		DeleteTimerQueueTimer(nil, timer^, nil)
-		timer^ = IoringTimer(INVALID_HANDLE)
+	} else when ODIN_OS == .Linux {
+		close_handle(Handle(timer^))
 	} else {
 		assert(false)
 	}
+	timer^ = IoringTimer(INVALID_HANDLE)
 }
 ioring_wait_for_next_event :: proc(ioring: Ioring, event: ^IoringEvent) {
 	when ODIN_OS == .Windows {

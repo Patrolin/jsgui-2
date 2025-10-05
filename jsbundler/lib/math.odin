@@ -13,15 +13,25 @@ WINDOWS_MAX_PATH :: 260
 // types
 Size :: distinct int
 
+IS_32BIT :: ODIN_ARCH == .i386 || ODIN_ARCH == .arm32 || ODIN_ARCH == .wasm32
+IS_64BIT ::
+	ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 || ODIN_ARCH == .wasm64p32
+
 CSHORT :: i16
 CUSHORT :: u16
+when IS_32BIT {
+	CINT :: i16
+	CUINT :: u16
+} else when IS_64BIT {
+	CINT :: i32
+	CUINT :: u32
+} else {
+	#assert(false)
+}
 CLONG :: i32
 CULONG :: u32
 CLONGLONG :: i64
 CULONGLONG :: u64
-
-CINT :: i32
-CUINT :: u32
 
 // int procs
 ptr_add :: #force_inline proc "contextless" (ptr: rawptr, offset: int) -> [^]byte {

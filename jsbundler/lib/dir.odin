@@ -55,6 +55,8 @@ ioring_watch_file_changes_async :: proc(ioring: Ioring, dir: ^WatchedDir) {
 			nil,
 		)
 		fmt.assertf(ok == true, "Failed to watch directory for changes")
+	} else when ODIN_OS == .Linux {
+		/* noop */
 	} else {
 		assert(false)
 	}

@@ -23,7 +23,7 @@ SocketAddressIpv4 :: struct {
 #assert(size_of(SocketAddressIpv4) == 16)
 
 Server :: struct {
-	socket:    Socket,
+	socket:    SocketHandle,
 	address:   SocketAddress,
 	ioring:    Ioring,
 	user_data: rawptr,
@@ -32,7 +32,7 @@ Server :: struct {
 Client :: struct {
 	using _:           Client_OsHeader `fmt:"-"`,
 	ioring:            Ioring, /* NOTE: pointer to server.ioring */
-	socket:            Socket,
+	socket:            SocketHandle,
 	address:           SocketAddress,
 	state:             ClientState,
 	timeout_timer:     TimerHandle,
@@ -53,7 +53,6 @@ ClientState :: enum {
 	ClosedByServer,
 }
 when ODIN_OS == .Windows {
-	Socket :: SOCKET
 	Server_OsFooter :: struct {
 		AcceptEx: ACCEPT_EX,
 	}
@@ -245,9 +244,8 @@ send_file_response_and_close_client :: proc(client: ^Client, header: []byte) {
 		head_length = u32(len(header)),
 	}
 
-	client.overlapped = {}
-
 	when ODIN_OS == .Windows {
+		client.overlapped = {}
 		ok := TransmitFile(
 			client.socket,
 			client.async_write_file,
@@ -271,7 +269,7 @@ cancel_io_and_close_client :: proc "system" (client: ^Client) {
 		CancelIoEx(Handle(client.socket), nil)
 		close_client(client)
 	} else {
-		#assert(false)
+		assert_contextless(false)
 	}
 }
 close_client :: proc "system" (client: ^Client) {
@@ -309,7 +307,7 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 				SOL_SOCKET,
 				SO_UPDATE_ACCEPT_CONTEXT,
 				&server.socket,
-				size_of(Socket),
+				size_of(SocketHandle),
 			) ==
 			0,
 			"Failed to set client params",
