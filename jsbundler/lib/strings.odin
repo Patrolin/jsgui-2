@@ -1,21 +1,72 @@
 package lib
 import "base:intrinsics"
+import "core:bytes"
 import "core:strings"
 
+// ascii
+@(private)
+_AsciiBitset :: distinct [2]u64
+@(private)
+_ASCII_MAX_CHAR :: 127
+#assert((_ASCII_MAX_CHAR >> 6) < len(_AsciiBitset))
+
+index_ascii_char :: proc "c" (str: string, start: int, ascii_char: byte) -> (middle: int) {
+	/* TODO: do SIMD in a better way */
+	slice := str[start:]
+	index_or_err := #force_inline bytes.index_byte(transmute([]u8)str, ascii_char)
+	return index_or_err == -1 ? len(str) : start + index_or_err
+}
+index_ascii :: proc "c" (str: string, start: int, ascii_chars: string) -> (middle: int) {
+	if len(ascii_chars) == 1 {
+		return index_ascii_char(str, start, ascii_chars[0])
+	} else {
+		as: _AsciiBitset
+		for i in 0 ..< len(ascii_chars) {
+			char := ascii_chars[i]
+			assert_contextless(char <= _ASCII_MAX_CHAR)
+			as[char >> 6] |= 1 << uint(char & 63)
+		}
+		for i in start ..< len(str) {
+			c := str[i]
+			if as[c >> 6] & (1 << (c & 63)) != 0 {return i}
+		}
+		return len(str)
+	}
+}
+index_ignore_newline :: proc "c" (str: string, start: int) -> (end: int) {
+	j := start
+	if j < len(str) && str[j] == '\r' {j += 1}
+	if j < len(str) && str[j] == '\n' {j += 1}
+	return j
+}
+index_ignore_newlines :: proc "c" (str: string, start: int) -> (end: int) {
+	j := start
+	for j < len(str) && (str[j] == '\r' || str[j] == '\n') {
+		j += 1
+	}
+	return j
+}
+last_index_ascii_char :: proc "c" (str: string, ascii_char: byte) -> (start: int) {
+	/* TODO: do SIMD in a better way */
+	index_or_err := #force_inline bytes.last_index_byte(transmute([]u8)str, ascii_char)
+	return index_or_err == -1 ? -1 : index_or_err
+}
+
+// strings
 /* NOTE: don't allow uninitialized StringBuilder... */
 @(private)
 StringBuilder :: strings.Builder
 string_builder :: #force_inline proc(allocator := context.temp_allocator) -> StringBuilder {
 	return strings.builder_make_none(allocator)
 }
-
 to_string :: #force_inline proc(sb: StringBuilder) -> string {
 	return strings.to_string(sb)
 }
-starts_with :: proc(str, prefix: string) -> bool {
+
+starts_with :: proc "c" (str, prefix: string) -> bool {
 	return len(str) >= len(prefix) && str[0:len(prefix)] == prefix
 }
-ends_with :: proc(str, suffix: string) -> bool {
+ends_with :: proc "c" (str, suffix: string) -> bool {
 	return len(str) >= len(suffix) && str[len(str) - len(suffix):] == suffix
 }
 
@@ -23,10 +74,10 @@ ends_with :: proc(str, suffix: string) -> bool {
 PRIME_RABIN_KARP: u32 : 16777619
 /* returns the first byte offset of the first `substring` in the `str`, or `len(str)` when not found. */
 @(private)
-hash_rabin_karp :: #force_inline proc "contextless" (hash, value: u32) -> u32 {
+hash_rabin_karp :: #force_inline proc "c" (hash, value: u32) -> u32 {
 	return hash * PRIME_RABIN_KARP + value
 }
-index :: proc "contextless" (str: string, start: int, substring: string) -> (middle: int) {
+index :: proc "c" (str: string, start: int, substring: string) -> (middle: int) {
 	slice := str[start:]
 	N := len(slice)
 	M := len(substring)
@@ -60,12 +111,12 @@ index :: proc "contextless" (str: string, start: int, substring: string) -> (mid
 	}
 	return len(str)
 }
-index_after :: proc(str: string, start: int, substr: string) -> (middle: int) {
+index_after :: proc "c" (str: string, start: int, substr: string) -> (middle: int) {
 	j := index(str, start, substr) + len(substr)
 	return min(j, len(str))
 }
 /* returns the first byte offset of the first `substring` in the `str`, or `len(str)` when not found. */
-index_multi :: proc(str: string, start: int, substrings: ..string) -> (middle, substr_index: int) {
+index_multi :: proc "c" (str: string, start: int, substrings: ..string) -> (middle, substr_index: int) {
 	slice := str[start:]
 	N := len(slice)
 	// find smallest substring
@@ -76,12 +127,12 @@ index_multi :: proc(str: string, start: int, substrings: ..string) -> (middle, s
 		}
 	}
 	M := len(smallest_substring)
-	assert(M > 0)
+	assert_contextless(M > 0)
 	if M > N {return len(str), 0}
 	// setup
 	hashes: [16]u32
 	K := len(substrings)
-	assert(K <= len(hashes))
+	assert_contextless(K <= len(hashes))
 	for k in 0 ..< K {
 		substr := substrings[k]
 		hash: u32
@@ -119,7 +170,7 @@ index_multi :: proc(str: string, start: int, substrings: ..string) -> (middle, s
 	}
 	return len(str), 0
 }
-index_multi_after :: proc(str: string, start: int, substrings: ..string) -> (middle, end, k: int) {
+index_multi_after :: proc "c" (str: string, start: int, substrings: ..string) -> (middle, end, k: int) {
 	middle, k = index_multi(str, start, ..substrings)
 	end = min(middle + len(substrings[k]), len(str))
 	return

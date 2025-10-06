@@ -9,11 +9,11 @@ HTTP_END :: "\r\n\r\n"
 get_http :: proc() {
 	server := connect_to_tcp_server()
 	send_http_request(server)
-	sb: strings.Builder
+	sb := lib.string_builder()
 	buffer: [4096]byte
 	for server.open {
 		receive_data(buffer)
-		response := strings.to_string(sb)
+		response := lib.to_string(sb)
 		if is_end_of_http_request(response) {return response}
 	}
 	return ""
