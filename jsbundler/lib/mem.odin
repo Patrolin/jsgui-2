@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:mem"
 
 // constants
-// NOTE: SSD block sizes are 512B or 4KiB
+/* NOTE: SSD block sizes are 512B or 4KiB */
 SSD_BLOCK_SIZE :: 512
 VIRTUAL_MEMORY_TO_RESERVE :: 1 << 16
 
@@ -16,15 +16,64 @@ HUGE_PAGE_SIZE_EXPONENT :: 21
 HUGE_PAGE_SIZE :: 1 << HUGE_PAGE_SIZE_EXPONENT
 #assert(HUGE_PAGE_SIZE == 2_097_152)
 
-// NOTE: multiple threads reading from the same cache line is fine, but writing can lead to false sharing
+/* NOTE: multiple threads reading from the same cache line is fine, but writing can lead to false sharing */
 CACHE_LINE_SIZE_EXPONENT :: 6
 CACHE_LINE_SIZE :: 1 << CACHE_LINE_SIZE_EXPONENT
 #assert(CACHE_LINE_SIZE == 64)
 
-// types
+// virtual
+@(private)
+DEBUG_VIRTUAL :: false
+
+init_page_fault_handler :: proc "contextless" () {
+	when ODIN_OS == .Windows {
+		_page_fault_exception_handler :: proc "system" (exception: ^_EXCEPTION_POINTERS) -> ExceptionResult {
+			exception_code := exception.ExceptionRecord.ExceptionCode
+			when DEBUG_VIRTUAL {
+				context = runtime.default_context()
+				exception_params := exception.ExceptionRecord.ExceptionInformation[:exception.ExceptionRecord.NumberParameters]
+				fmt.printfln("exception %v: %v", exception_code, exception_params)
+			}
+			if exception_code == .EXCEPTION_ACCESS_VIOLATION {
+				ptr := exception.ExceptionRecord.ExceptionInformation[1]
+				page_ptr := rawptr(uintptr(ptr) & ~uintptr(PAGE_SIZE - 1))
+				commited_ptr := VirtualAlloc(page_ptr, PAGE_SIZE, {.MEM_COMMIT}, {.PAGE_READWRITE})
+				return page_ptr != nil && commited_ptr != nil ? .EXCEPTION_CONTINUE_EXECUTION : .EXCEPTION_EXECUTE_HANDLER
+			}
+			return .EXCEPTION_EXECUTE_HANDLER
+		}
+		SetUnhandledExceptionFilter(_page_fault_exception_handler)
+	} else when ODIN_OS == .Linux {
+		/* NOTE: linux has a default page fault handler */
+	} else {
+		assert_contextless(false)
+	}
+}
+page_reserve :: proc(size: Size) -> []byte {
+	when ODIN_OS == .Windows {
+		ptr := VirtualAlloc(nil, size, {.MEM_RESERVE}, {.PAGE_READWRITE})
+		assert(ptr != nil)
+	} else when ODIN_OS == .Linux {
+		ptr := mmap(nil, size, {.PROT_READ, .PROT_WRITE}, {.MAP_PRIVATE, .MAP_ANONYMOUS})
+		assert(ptr != max(uintptr))
+	} else {
+		assert(false)
+	}
+	return ([^]byte)(ptr)[:size]
+}
+page_free :: proc(ptr: rawptr) {
+	when ODIN_OS == .Windows {
+		assert(bool(VirtualFree(ptr, 0, {.MEM_RELEASE})))
+	} else when ODIN_OS == .Linux {
+		assert(munmap(ptr, 0) == 0)
+	} else {
+		assert(false)
+	}
+}
+
+// locks
 Lock :: distinct bool
 
-// lock procs
 mfence :: #force_inline proc "contextless" () {
 	intrinsics.atomic_thread_fence(.Seq_Cst)
 }
@@ -45,7 +94,7 @@ release_lock :: #force_inline proc "contextless" (lock: ^Lock) {
 	intrinsics.atomic_store(lock, false)
 }
 
-// copy procs
+// copy
 zero :: proc(buffer: []byte) {
 	dest := uintptr(raw_data(buffer))
 	dest_end := dest + uintptr(len(buffer))
@@ -77,7 +126,7 @@ copy :: proc(from, to: []byte) {
 	}
 }
 
-// arena types
+// arena
 ArenaAllocator :: struct {
 	buffer_start: uintptr,
 	buffer_end:   uintptr,
@@ -86,7 +135,6 @@ ArenaAllocator :: struct {
 	lock:         Lock,
 }
 
-// arena procs
 arena_allocator :: proc(arena_allocator: ^ArenaAllocator, buffer: []byte) -> mem.Allocator {
 	buffer_start := uintptr(raw_data(buffer))
 	buffer_end := buffer_start + uintptr(len(buffer))

@@ -14,8 +14,7 @@ WINDOWS_MAX_PATH :: 260
 Size :: distinct int
 
 IS_32BIT :: ODIN_ARCH == .i386 || ODIN_ARCH == .arm32 || ODIN_ARCH == .wasm32
-IS_64BIT ::
-	ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 || ODIN_ARCH == .wasm64p32
+IS_64BIT :: ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 || ODIN_ARCH == .wasm64p32
 
 CSHORT :: i16
 CUSHORT :: u16
