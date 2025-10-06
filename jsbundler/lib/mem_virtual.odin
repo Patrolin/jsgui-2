@@ -34,7 +34,7 @@ page_reserve :: proc(size: Size) -> []byte {
 		ptr := VirtualAlloc(nil, size, {.MEM_RESERVE}, {.PAGE_READWRITE})
 		assert(ptr != nil)
 	} else when ODIN_OS == .Linux {
-		ptr := mmap(nil, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS)
+		ptr := mmap(nil, size, {.PROT_READ, .PROT_WRITE}, {.MAP_PRIVATE, .MAP_ANONYMOUS})
 		assert(ptr != max(uintptr))
 	} else {
 		assert(false)

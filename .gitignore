@@ -4,3 +4,4 @@ node_modules
 *.obj
 *.cpp
 *.out
+*.bin

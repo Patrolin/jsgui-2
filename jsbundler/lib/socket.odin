@@ -29,6 +29,21 @@ Server :: struct {
 	user_data: rawptr,
 	using _:   Server_OsFooter,
 }
+when ODIN_OS == .Windows {
+	ClientAsyncBuffer :: struct {
+		async_write_slice: TRANSMIT_FILE_BUFFERS,
+		async_rw_slice:    WSABUF,
+		async_rw_buffer:   [2048]byte `fmt:"-"`,
+	}
+} else when ODIN_OS == .Linux {
+	ClientAsyncBuffer :: struct {
+		async_write_slice: struct{},
+		async_rw_slice:    struct{},
+		async_rw_buffer:   [2048]byte `fmt:"-"`,
+	}
+} else {
+	//#assert(false)
+}
 Client :: struct {
 	using _:           Client_OsHeader `fmt:"-"`,
 	ioring:            Ioring, /* NOTE: pointer to server.ioring */
@@ -38,11 +53,9 @@ Client :: struct {
 	timeout_timer:     TimerHandle,
 	/* `FileHandle` or `INVALID_HANDLE` */
 	async_write_file:  FileHandle,
-	async_write_slice: TRANSMIT_FILE_BUFFERS `fmt:"-"`,
 	async_rw_prev_pos: int,
 	async_rw_pos:      int,
-	async_rw_slice:    WSABUF `fmt:"-"`,
-	async_rw_buffer:   [2048]byte `fmt:"-"`,
+	using _:           ClientAsyncBuffer `fmt:"-"`,
 }
 ClientState :: enum {
 	New,
@@ -196,9 +209,13 @@ send_file_response_and_close_client :: proc(client: ^Client, header: []byte) {
 	client.async_rw_prev_pos = 0
 	client.async_rw_pos = 0
 	client.async_rw_slice = {}
-	client.async_write_slice = {
-		head        = &client.async_rw_buffer[0],
-		head_length = u32(len(header)),
+	when ODIN_OS == .Windows {
+		client.async_write_slice = {
+			head        = &client.async_rw_buffer[0],
+			head_length = u32(len(header)),
+		}
+	} else {
+		assert(false)
 	}
 
 	when ODIN_OS == .Windows {
@@ -268,7 +285,7 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 				client := (^Client)(user_ptr)
 				PostQueuedCompletionStatus(client.ioring, 0, TIMEOUT_COMPLETION_KEY, &client.overlapped)
 			} else {
-				assert(false, "Shouldn't be necessary on other platforms")
+				assert_contextless(false, "Shouldn't be necessary on other platforms")
 			}
 		}
 		ioring_set_timer_async(server.ioring, &client.timeout_timer, TIMEOUT_MS, client, on_timeout)

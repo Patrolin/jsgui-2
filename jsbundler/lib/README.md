@@ -13,3 +13,7 @@ Splitting files into `XXX_windows.odin` and `XXX_linux.odin` only creates \
 more confusion, as you end with way too many files that are all organized \
 differently, so you can't even compare implementations. \
 This way we can also type `XXX()` everywhere, instead of `os.XXX()`.
+
+Having `context.allocator` is actually not good, because you don't really know \
+what can allocate and what can't. It's much better to pass the allocator \
+explicitly, and have `proc(allocator := context.temp_allocator)` by default.

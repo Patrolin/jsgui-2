@@ -10,6 +10,7 @@ import "lib"
 
 // params
 SERVE_THREAD_COUNT :: 1
+PRINT_REBUILD :: false
 
 // globals
 global_serve_enabled := true
@@ -150,7 +151,7 @@ serve_http_or_rebuild :: proc(server: ^lib.Server) {
 	}
 }
 rebuild_index_file :: proc() {
-	fmt.print("\r- Rebuilding...")
+	when PRINT_REBUILD {fmt.print("\r- Rebuilding...")}
 	WalkData :: struct {
 		css_texts: [dynamic]string,
 		js_texts:  [dynamic]string,
@@ -205,5 +206,5 @@ rebuild_index_file :: proc() {
 	}
 	lib.write_to_file(index_file, "</script>")
 	lib.close_file(index_file)
-	fmt.printf("\r- Bundled into index.html")
+	when PRINT_REBUILD {fmt.printf("\r- Bundled into index.html")}
 }

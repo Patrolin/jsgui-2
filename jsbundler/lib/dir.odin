@@ -7,10 +7,13 @@ when ODIN_OS == .Windows {
 		overlapped:   OVERLAPPED,
 		path:         string,
 		handle:       DirHandle,
-		async_buffer: [4096 -
-		32 -
-		16 -
-		8]byte `fmt:"-"`,
+		async_buffer: [4096 - size_of(OVERLAPPED) - size_of(string) - size_of(DirHandle)]byte `fmt:"-"`,
+	}
+} else when ODIN_OS == .Linux {
+	WatchedDir :: struct {
+		path:         string,
+		handle:       DirHandle,
+		async_buffer: [4096 - size_of(string) - size_of(DirHandle)]byte `fmt:"-"`,
 	}
 } else {
 	//#assert(false)
@@ -32,11 +35,7 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 				FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
 			),
 		)
-		fmt.assertf(
-			dir.handle != DirHandle(INVALID_HANDLE),
-			"Failed to open directory for watching: '%v'",
-			dir.path,
-		)
+		fmt.assertf(dir.handle != DirHandle(INVALID_HANDLE), "Failed to open directory for watching: '%v'", dir.path)
 		// associate with ioring
 		assert(CreateIoCompletionPort(Handle(dir.handle), ioring, 0, 0) != 0)
 	} else {
@@ -47,16 +46,7 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 /* NOTE: same caveats as walk_files() */
 ioring_watch_file_changes_async :: proc(ioring: Ioring, dir: ^WatchedDir) {
 	when ODIN_OS == .Windows {
-		ok := ReadDirectoryChangesW(
-			dir.handle,
-			&dir.async_buffer[0],
-			len(dir.async_buffer),
-			true,
-			FILE_NOTIFY_CHANGE_LAST_WRITE,
-			nil,
-			&dir.overlapped,
-			nil,
-		)
+		ok := ReadDirectoryChangesW(dir.handle, &dir.async_buffer[0], len(dir.async_buffer), true, FILE_NOTIFY_CHANGE_LAST_WRITE, nil, &dir.overlapped, nil)
 		fmt.assertf(ok == true, "Failed to watch directory for changes")
 	} else when ODIN_OS == .Linux {
 		/* noop */
@@ -77,14 +67,7 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 			wfile_path := tprint_string_as_wstring(file_path)
 
 			// wait for file_size to change..
-			file := CreateFileW(
-				&wfile_path[0],
-				GENERIC_READ,
-				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-				nil,
-				F_OPEN,
-				FILE_ATTRIBUTE_NORMAL,
-			)
+			file := CreateFileW(&wfile_path[0], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nil, F_OPEN, FILE_ATTRIBUTE_NORMAL)
 			fmt.assertf(file != INVALID_HANDLE, "file: %v, file_path: '%v'", file, file_path)
 			defer close_file(FileHandle(file))
 

@@ -33,7 +33,7 @@ ioring_create :: proc() -> (ioring: Ioring) {
 		ioring = CreateIoCompletionPort(INVALID_HANDLE, 0, 0, 0)
 		fmt.assertf(ioring != 0, "Failed to create ioring")
 	} else when ODIN_OS == .Linux {
-		ioring = epoll_create1(0)
+		ioring = epoll_create1({})
 		fmt.assertf(ioring >= 0, "Failed to create ioring, err: %v", ioring)
 	} else {
 		assert(false)
@@ -55,11 +55,11 @@ ioring_set_timer_async :: proc(
 		ok := CreateTimerQueueTimer(timer, 0, on_timeout, user_data, ms_u32, 0, {.WT_EXECUTEONLYONCE})
 		fmt.assertf(bool(ok), "Failed to create a timer")
 	} else when ODIN_OS == .Linux {
-		timer^ = timerfd_create(.CLOCK_MONOTONIC, 0)
+		timer^ = timerfd_create(.CLOCK_MONOTONIC, {})
 		timer_options := TimerOptions64 {
 			it_value = {tv_sec = 1},
 		}
-		timerfd_settime64(timer^, 0, &timer_options)
+		timerfd_settime64(timer^, {}, &timer_options)
 		fmt.assertf(Handle(timer^) != INVALID_HANDLE, "Failed to create a timer")
 	} else {
 		assert(false)

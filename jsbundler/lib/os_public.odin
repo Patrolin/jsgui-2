@@ -13,4 +13,4 @@ DirHandle :: distinct Handle
 SocketHandle :: distinct Handle
 
 // flags
-INVALID_HANDLE :: Handle(max(uintptr))
+INVALID_HANDLE :: max(Handle)

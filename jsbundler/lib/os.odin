@@ -238,10 +238,20 @@ when ODIN_OS == .Windows {
 	close_handle :: #force_inline proc "system" (handle: Handle) -> int {
 		return int(intrinsics.syscall(linux.SYS_close, uintptr(handle)))
 	}
-	copy_to_cstring :: proc(str: string, cbuffer: []byte) {
-		assert(len(str) + 1 < len(cbuffer))
+	@(require_results)
+	copy_to_cstring :: #force_inline proc(str: string, cbuffer: []byte) -> (cstr: cstring, next_cbuffer: []byte) #no_bounds_check {
+		clen := len(str) + 1
+		assert(clen < len(cbuffer))
 		copy(transmute([]byte)(str), cbuffer)
 		cbuffer[len(str)] = 0
+		cstr = cstring(&cbuffer[0])
+		next_cbuffer = cbuffer[clen:]
+		return
+	}
+	string_from_cstring :: #force_inline proc(cstr: [^]byte, len_lower_bound: int) -> string #no_bounds_check {
+		len := len_lower_bound
+		for cstr[len] != 0 {len += 1}
+		return transmute(string)(runtime.Raw_String{transmute([^]byte)cstr, len})
 	}
 } else {
 	//#assert(false)
@@ -356,7 +366,15 @@ when ODIN_OS == .Windows {
 		file: FileHandle = max(FileHandle),
 		offset: uint = 0,
 	) -> uintptr {
-		return intrinsics.syscall(linux.SYS_mmap, uintptr(address), uintptr(size), uintptr(protect_flags), uintptr(type_flags), uintptr(file), uintptr(offset))
+		return intrinsics.syscall(
+			linux.SYS_mmap,
+			uintptr(address),
+			uintptr(size),
+			uintptr(transmute(CINT)(protect_flags)),
+			uintptr(transmute(CINT)(type_flags)),
+			uintptr(file),
+			uintptr(offset),
+		)
 	}
 	munmap :: #force_inline proc(address: rawptr, size: Size) -> uintptr {
 		return intrinsics.syscall(linux.SYS_munmap, uintptr(address), uintptr(size))
@@ -405,10 +423,17 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Linux {
 	// types
 	EpollHandle :: distinct Handle
+	EpollEventFlags :: bit_set[enum {
+		EPOLLIN      = 0,
+		EPOLLONESHOT = 30,
+		EPOLLET      = 31,
+	};CINT]
 	EpollEvent :: struct {
-		events: u32,
+		events: EpollEventFlags,
 		data:   struct #raw_union {
 			rawptr: rawptr,
+			handle: Handle,
+			u32:    u32,
 			u64:    u64,
 		},
 	}
@@ -423,20 +448,21 @@ when ODIN_OS == .Windows {
 	}
 
 	// flags
+	EpollFlags :: bit_set[enum {};CINT]
 	EpollOp :: enum {
 		EPOLL_CTL_ADD = 1,
 		EPOLL_CTL_DEL = 2,
 		EPOLL_CTL_MOD = 3,
 	}
-	EPOLLIN :: 1
 	ClockType :: enum {
 		CLOCK_REALTIME  = 0,
 		CLOCK_MONOTONIC = 1,
 	}
+	TimerFlags :: bit_set[enum {};CINT]
 
 	// procs
-	epoll_create1 :: #force_inline proc "system" (flags: CINT) -> EpollHandle {
-		result := intrinsics.syscall(linux.SYS_epoll_create1)
+	epoll_create1 :: #force_inline proc "system" (flags: EpollFlags) -> EpollHandle {
+		result := intrinsics.syscall(linux.SYS_epoll_create1, uintptr(transmute(CINT)(flags)))
 		return EpollHandle(result)
 	}
 	epoll_ctl :: #force_inline proc "system" (epoll: EpollHandle, op: CINT, fd: FileHandle, event: ^EpollEvent) -> int {
@@ -445,16 +471,21 @@ when ODIN_OS == .Windows {
 	epoll_wait :: #force_inline proc "system" (epoll: EpollHandle, events: [^]EpollEvent, events_count: CINT, timeout := max(CINT)) -> int {
 		return int(intrinsics.syscall(linux.SYS_epoll_wait, uintptr(epoll), uintptr(events), uintptr(events_count), uintptr(timeout)))
 	}
-	timerfd_create :: #force_inline proc "system" (type: ClockType, flags: CINT) -> TimerHandle {
-		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(flags)))
+	timerfd_create :: #force_inline proc "system" (type: ClockType, flags: TimerFlags) -> TimerHandle {
+		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(transmute(CINT)(flags))))
 	}
-	timerfd_settime64 :: #force_inline proc "system" (timer: TimerHandle, flags: CINT, options: ^TimerOptions64, old_options: ^TimerOptions64 = nil) -> int {
+	timerfd_settime64 :: #force_inline proc "system" (
+		timer: TimerHandle,
+		flags: TimerFlags,
+		options: ^TimerOptions64,
+		prev_options: ^TimerOptions64 = nil,
+	) -> int {
 		when IS_64BIT {
 			syscall_id := linux.SYS_timerfd_settime
 		} else {
 			syscall_id := linux.SYS_timerfd_settime64
 		}
-		return int(intrinsics.syscall(syscall_id, uintptr(timer), uintptr(flags), uintptr(options), uintptr(old_options)))
+		return int(intrinsics.syscall(syscall_id, uintptr(timer), uintptr(transmute(CINT)(flags)), uintptr(options), uintptr(prev_options)))
 	}
 } else {
 	//#assert(false)
@@ -512,7 +543,7 @@ when ODIN_OS == .Windows {
 		FindClose :: proc(find: FindFile) -> BOOL ---
 
 		/* Return the new `FileHandle`, `DirHandle`, or `INVALID_HANDLE` */
-		CreateFileW :: proc(lpFileName: CWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: ^SECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: Handle = 0) -> Handle ---
+		CreateFileW :: proc(lpFileName: CWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: ^SECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: FileHandle = 0) -> FileHandle ---
 		GetFileSizeEx :: proc(file: FileHandle, file_size: ^LARGE_INTEGER) -> BOOL ---
 		ReadFile :: proc(file: FileHandle, buffer: [^]byte, bytes_to_read: DWORD, bytes_read: ^DWORD, overlapped: ^OVERLAPPED) -> BOOL ---
 		WriteFile :: proc(file: FileHandle, buffer: [^]byte, bytes_to_write: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED) -> BOOL ---
@@ -521,21 +552,35 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Linux {
 	// types
 	FileMode :: CUINT
+	Dirent64Type :: enum u8 {
+		Unknown         = 0,
+		Pipe            = 1,
+		CharacterDevice = 2,
+		Dir             = 4,
+		BlockDevice     = 6,
+		File            = 8,
+		Link            = 10,
+		Socket          = 12,
+		Whiteout        = 14,
+	}
 	Dirent64 :: struct {
 		inode:      i64,
-		_internal:  i64,
+		_internal:  i64 `fmt:"-"`,
 		size:       CUSHORT,
-		type:       byte,
+		type:       Dirent64Type,
 		cfile_name: [1]byte,
 	}
 
 	// flags
 	AT_FDCWD :: transmute(DirHandle)(i32(-100))
-	O_RDONLY :: 0
-	O_DIRECTORY :: 0
+	FileFlags :: bit_set[enum {
+		O_WRONLY    = 0,
+		O_RDWR      = 1,
+		O_DIRECTORY = 16,
+	};CINT]
 
 	// procs
-	mkdir :: #force_inline proc(dir_path: cstring, mode: FileMode = 0o755) -> int #no_bounds_check {
+	mkdir :: #force_inline proc(dir_path: cstring, mode: FileMode = 0o755) -> int {
 		result := intrinsics.syscall(linux.SYS_mkdir, transmute(uintptr)(dir_path), uintptr(mode))
 		return int(result)
 	}
@@ -554,9 +599,14 @@ when ODIN_OS == .Windows {
 		result := intrinsics.syscall(linux.SYS_getdents64, uintptr(file), uintptr(buffer), uintptr(buffer_size))
 		return int(result)
 	}
-	open :: #force_inline proc "system" (path: cstring, flags: CINT, mode: FileMode = 0o755) -> Handle {
-		result := intrinsics.syscall(linux.SYS_open, transmute(uintptr)(path), uintptr(flags), uintptr(mode))
-		return Handle(result)
+	/* Return the new `FileHandle`, `DirHandle`, or `INVALID_HANDLE` */
+	open :: #force_inline proc "system" (path: cstring, flags: FileFlags = {}, mode: FileMode = 0o755) -> FileHandle {
+		result := intrinsics.syscall(linux.SYS_open, transmute(uintptr)(path), uintptr(transmute(CINT)(flags)), uintptr(mode))
+		return FileHandle(result)
+	}
+	read :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> int {
+		result := intrinsics.syscall(linux.SYS_read, uintptr(file), uintptr(buffer), uintptr(buffer_size))
+		return int(result)
 	}
 } else {
 	//#assert(false)

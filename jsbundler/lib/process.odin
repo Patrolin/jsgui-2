@@ -2,6 +2,7 @@ package lib
 import "core:fmt"
 
 get_args :: proc(allocator := context.temp_allocator) -> (args: [dynamic]string) {
+	args.allocator = allocator
 	when ODIN_OS == .Windows {
 		wargs := GetCommandLineW()
 		i := 0
@@ -30,6 +31,15 @@ get_args :: proc(allocator := context.temp_allocator) -> (args: [dynamic]string)
 			}
 			for wargs[i] != 0 && (wargs[i] == ' ' || wargs[i] == '\t') {
 				i += 1
+			}
+		}
+	} else when ODIN_OS == .Linux {
+		args_file, ok := read_file("/proc/self/cmdline", allocator = allocator)
+		i := 0
+		for c, j in args_file {
+			if c == 0 {
+				append(&args, args_file[i:j])
+				i = j + 1
 			}
 		}
 	} else {
