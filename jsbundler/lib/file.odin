@@ -5,7 +5,7 @@ create_dir_if_not_exists :: proc(dir_path: string) -> (ok: bool) {
 	when ODIN_OS == .Windows {
 		CreateDirectoryW(&tprint_string_as_wstring(dir_path)[0], nil)
 		err := GetLastError()
-		return err != ERROR_PATH_NOT_FOUND
+		return err != .ERROR_PATH_NOT_FOUND
 	} else when ODIN_OS == .Linux {
 		cdir_path: [WINDOWS_MAX_PATH]byte = ---
 		copy_to_cstring(dir_path, cdir_path[:])
@@ -115,7 +115,6 @@ read_file :: proc(file_path: string) -> (text: string, ok: bool) {
 			nil,
 			F_OPEN,
 			FILE_ATTRIBUTE_NORMAL,
-			nil,
 		)
 		ok = file != INVALID_HANDLE
 		if !ok {
@@ -148,7 +147,6 @@ open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHand
 				nil,
 				F_CREATE_OR_OPEN_AND_TRUNCATE,
 				FILE_ATTRIBUTE_NORMAL,
-				nil,
 			),
 		)
 		ok = file != FileHandle(INVALID_HANDLE)

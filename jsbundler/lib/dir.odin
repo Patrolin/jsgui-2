@@ -30,12 +30,15 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 				F_OPEN,
 				/* NOTE: FILE_FLAG_BACKUP_SEMANTICS is required for directories */
 				FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-				nil,
 			),
 		)
-		fmt.assertf(dir.handle != nil, "Failed to open directory for watching: '%v'", dir.path)
+		fmt.assertf(
+			dir.handle != DirHandle(INVALID_HANDLE),
+			"Failed to open directory for watching: '%v'",
+			dir.path,
+		)
 		// associate with ioring
-		assert(CreateIoCompletionPort(Handle(dir.handle), ioring, 0, 0) != nil)
+		assert(CreateIoCompletionPort(Handle(dir.handle), ioring, 0, 0) != 0)
 	} else {
 		assert(false)
 	}
@@ -81,7 +84,6 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 				nil,
 				F_OPEN,
 				FILE_ATTRIBUTE_NORMAL,
-				nil,
 			)
 			fmt.assertf(file != INVALID_HANDLE, "file: %v, file_path: '%v'", file, file_path)
 			defer close_file(FileHandle(file))

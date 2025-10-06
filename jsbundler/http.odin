@@ -60,7 +60,9 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 	}
 
 	if client.state == .ClosedByServer {
-		if client.async_write_file != nil {lib.close_file(client.async_write_file)}
+		if client.async_write_file != lib.FileHandle(lib.INVALID_HANDLE) {
+			lib.close_file(client.async_write_file)
+		}
 		free(client)
 	}
 }

@@ -34,10 +34,7 @@ FILES_TO_INIT :: []FileToInit {
 }
 
 print_help_and_exit :: proc() {
-	fmt.printfln(
-		"  jsbundler [port]  - serve at [port=%v] and rebuild when files change",
-		global_serve_port,
-	)
+	fmt.printfln("  jsbundler [port]  - serve at [port=%v] and rebuild when files change", global_serve_port)
 	fmt.println("  jsbundler build   - build and exit")
 	fmt.println("  jsbundler help    - print this")
 	fmt.println("  jsbundler version - print the version number")
@@ -128,6 +125,8 @@ serve_http_or_rebuild_proc :: proc "system" (user_data: rawptr) -> (return_code:
 		temp_buffer := lib.page_reserve(lib.GibiByte)
 		arena_allocator: lib.ArenaAllocator
 		context.temp_allocator = lib.arena_allocator(&arena_allocator, temp_buffer)
+	} else {
+		context = runtime.default_context()
 	}
 	serve_http_or_rebuild(server)
 	return
@@ -142,7 +141,6 @@ serve_http_or_rebuild :: proc(server: ^lib.Server) {
 		lib.ioring_wait_for_next_event(server.ioring, &event)
 
 		is_dir_event := rawptr(event.user_data) == watched_dir
-		//fmt.printfln("is_dir_event: %v, event: %v", is_dir_event, event)
 		if is_dir_event {
 			lib.wait_for_writes_to_finish(watched_dir)
 			rebuild_index_file()
