@@ -43,10 +43,10 @@ when ODIN_OS == .Windows {
 	foreign import kernel32 "system:Kernel32.lib"
 	@(default_calling_convention = "c")
 	foreign kernel32 {
-		WideCharToMultiByte :: proc(CodePage: CodePage, flags: WideCharFlags, lpWideCharStr: CWSTR, cchWideChar: CINT, lpMultiByteStr: CSTR, cbMultiByte: CINT, lpDefaultChar: CSTR, lpUsedDefaultChar: ^BOOL) -> CINT ---
-		MultiByteToWideChar :: proc(CodePage: CodePage, flags: MultiByteFlags, lpMultiByteStr: CSTR, cbMultiByte: CINT, lpWideCharStr: CWSTR, cchWideChar: CINT) -> CINT ---
+		WideCharToMultiByte :: proc(CodePage: CodePage, flags: WideCharFlags, wstr: CWSTR, wlen: CINT, str: CSTR, len: CINT, lpDefaultChar: CSTR, lpUsedDefaultChar: ^BOOL) -> CINT ---
+		MultiByteToWideChar :: proc(CodePage: CodePage, flags: MultiByteFlags, str: CSTR, len: CINT, wstr: CWSTR, wlen: CINT) -> CINT ---
 		GetLastError :: proc() -> OsError ---
-		//CreateEventW :: proc(attributes: ^SECURITY_ATTRIBUTES, manual_reset: BOOL, initial_state: BOOL, name: CWSTR) -> Handle ---
+		//CreateEventW :: proc(security: ^SECURITY_ATTRIBUTES, manual_reset: BOOL, initial_state: BOOL, name: CWSTR) -> Handle ---
 		//ResetEvent :: proc(handle: Handle) -> BOOL ---
 		//WaitForSingleObject :: proc(handle: Handle, milliseconds: DWORD) -> DWORD ---
 		CloseHandle :: proc(handle: Handle) -> BOOL ---
@@ -242,7 +242,7 @@ when ODIN_OS == .Windows {
 	copy_to_cstring :: #force_inline proc(str: string, cbuffer: []byte) -> (cstr: cstring, next_cbuffer: []byte) #no_bounds_check {
 		clen := len(str) + 1
 		assert(clen < len(cbuffer))
-		copy(transmute([]byte)(str), cbuffer)
+		copy(transmute([]byte)str, cbuffer)
 		cbuffer[len(str)] = 0
 		cstr = cstring(&cbuffer[0])
 		next_cbuffer = cbuffer[clen:]
@@ -251,7 +251,7 @@ when ODIN_OS == .Windows {
 	string_from_cstring :: #force_inline proc(cstr: [^]byte, len_lower_bound: int) -> string #no_bounds_check {
 		len := len_lower_bound
 		for cstr[len] != 0 {len += 1}
-		return transmute(string)(runtime.Raw_String{transmute([^]byte)cstr, len})
+		return transmute(string)runtime.Raw_String{transmute([^]byte)cstr, len}
 	}
 } else {
 	//#assert(false)
@@ -370,8 +370,8 @@ when ODIN_OS == .Windows {
 			linux.SYS_mmap,
 			uintptr(address),
 			uintptr(size),
-			uintptr(transmute(CINT)(protect_flags)),
-			uintptr(transmute(CINT)(type_flags)),
+			uintptr(transmute(CINT)protect_flags),
+			uintptr(transmute(CINT)type_flags),
 			uintptr(file),
 			uintptr(offset),
 		)
@@ -462,7 +462,7 @@ when ODIN_OS == .Windows {
 
 	// procs
 	epoll_create1 :: #force_inline proc "system" (flags: EpollFlags) -> EpollHandle {
-		result := intrinsics.syscall(linux.SYS_epoll_create1, uintptr(transmute(CINT)(flags)))
+		result := intrinsics.syscall(linux.SYS_epoll_create1, uintptr(transmute(CINT)flags))
 		return EpollHandle(result)
 	}
 	epoll_ctl :: #force_inline proc "system" (epoll: EpollHandle, op: CINT, fd: FileHandle, event: ^EpollEvent) -> int {
@@ -472,7 +472,7 @@ when ODIN_OS == .Windows {
 		return int(intrinsics.syscall(linux.SYS_epoll_wait, uintptr(epoll), uintptr(events), uintptr(events_count), uintptr(timeout)))
 	}
 	timerfd_create :: #force_inline proc "system" (type: ClockType, flags: TimerFlags) -> TimerHandle {
-		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(transmute(CINT)(flags))))
+		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(transmute(CINT)flags)))
 	}
 	timerfd_settime64 :: #force_inline proc "system" (
 		timer: TimerHandle,
@@ -485,7 +485,7 @@ when ODIN_OS == .Windows {
 		} else {
 			syscall_id := linux.SYS_timerfd_settime64
 		}
-		return int(intrinsics.syscall(syscall_id, uintptr(timer), uintptr(transmute(CINT)(flags)), uintptr(options), uintptr(prev_options)))
+		return int(intrinsics.syscall(syscall_id, uintptr(timer), uintptr(transmute(CINT)flags), uintptr(options), uintptr(prev_options)))
 	}
 } else {
 	//#assert(false)
@@ -497,54 +497,53 @@ when ODIN_OS == .Windows {
 	FindFile :: distinct Handle
 
 	// flags
-	/* TODO: bitsets for file flags */
-	MOVEFILE_REPLACE_EXISTING :: 1
-
-	GENERIC_READ: DWORD : 0x80000000
-	GENERIC_WRITE: DWORD : 0x40000000
-	GENERIC_EXECUTE: DWORD : 0x20000000
-	GENERIC_ALL: DWORD : 0x10000000
-
-	FILE_SHARE_READ: DWORD : 0x00000001
-	FILE_SHARE_WRITE: DWORD : 0x00000002
-	FILE_SHARE_DELETE: DWORD : 0x00000004
-
-	F_CREATE: DWORD : 1
-	F_CREATE_OR_OPEN: DWORD : 4
-	F_CREATE_OR_OPEN_AND_TRUNCATE: DWORD : 2
-	F_OPEN: DWORD : 3
-	F_OPEN_AND_TRUNCATE: DWORD : 5
-
-	FILE_ATTRIBUTE_DIRECTORY: DWORD : 0x00000010
-	FILE_ATTRIBUTE_NORMAL: DWORD : 0x00000080
-
-	FILE_FLAG_WRITE_THROUGH: DWORD : 0x80000000
-	FILE_FLAG_OVERLAPPED: DWORD : 0x40000000
-	FILE_FLAG_NO_BUFFERING: DWORD : 0x20000000
-	FILE_FLAG_RANDOM_ACCESS: DWORD : 0x10000000
-	FILE_FLAG_SEQUENTIAL_SCAN: DWORD : 0x08000000
-	FILE_FLAG_BACKUP_SEMANTICS: DWORD : 0x02000000
-
-	FILE_NOTIFY_CHANGE_FILE_NAME :: 0x00000001
-	FILE_NOTIFY_CHANGE_DIR_NAME :: 0x00000002
-	FILE_NOTIFY_CHANGE_ATTRIBUTES :: 0x00000004
-	FILE_NOTIFY_CHANGE_SIZE :: 0x00000008
-	FILE_NOTIFY_CHANGE_LAST_WRITE :: 0x00000010
-	FILE_NOTIFY_CHANGE_LAST_ACCESS :: 0x00000020
-	FILE_NOTIFY_CHANGE_CREATION :: 0x00000040
-	FILE_NOTIFY_CHANGE_SECURITY :: 0x00000100
+	MoveFileFlags :: bit_set[enum {
+		MOVEFILE_REPLACE_EXISTING = 0,
+		MOVEFILE_WRITE_THROUGH    = 3,
+	};DWORD]
+	FileAccessFlags :: bit_set[enum {
+		/* subset of `GENERIC_READ` */
+		FILE_LIST_DIRECTORY = 0,
+		GENERIC_ALL         = 28,
+		GENERIC_EXECUTE     = 29,
+		GENERIC_WRITE       = 30,
+		GENERIC_READ        = 31,
+	};DWORD]
+	FileShareFlags :: bit_set[enum {
+		FILE_SHARE_READ   = 0,
+		FILE_SHARE_WRITE  = 1,
+		/* delete and rename */
+		FILE_SHARE_DELETE = 2,
+	};DWORD]
+	FileCreationType :: enum DWORD {
+		Create                  = 1,
+		CreateOrOpen            = 4,
+		CreateOrOpenAndTruncate = 2,
+		Open                    = 3,
+		OpenAndTruncate         = 5,
+	}
+	FileCreationFlags :: bit_set[enum {
+		FILE_ATTRIBUTE_DIRECTORY   = 4,
+		FILE_ATTRIBUTE_NORMAL      = 7,
+		FILE_FLAG_BACKUP_SEMANTICS = 25,
+		FILE_FLAG_SEQUENTIAL_SCAN  = 27,
+		FILE_FLAG_RANDOM_ACCESS    = 28,
+		FILE_FLAG_NO_BUFFERING     = 29,
+		FILE_FLAG_OVERLAPPED       = 30,
+		FILE_FLAG_WRITE_THROUGH    = 31,
+	};DWORD]
 
 	// procs
 	@(default_calling_convention = "c")
 	foreign kernel32 {
-		CreateDirectoryW :: proc(path: CWSTR, attributes: ^SECURITY_ATTRIBUTES) -> BOOL ---
-		MoveFileExW :: proc(src, dest: CWSTR, flags: DWORD) -> BOOL ---
-		FindFirstFileW :: proc(file_name: CWSTR, data: ^WIN32_FIND_DATAW) -> FindFile ---
+		CreateDirectoryW :: proc(wdir_path: CWSTR, security: ^SECURITY_ATTRIBUTES) -> BOOL ---
+		MoveFileExW :: proc(wsrc, wdest: CWSTR, flags: MoveFileFlags) -> BOOL ---
+		FindFirstFileW :: proc(wfile_name: CWSTR, data: ^WIN32_FIND_DATAW) -> FindFile ---
 		FindNextFileW :: proc(find: FindFile, data: ^WIN32_FIND_DATAW) -> BOOL ---
 		FindClose :: proc(find: FindFile) -> BOOL ---
 
 		/* Return the new `FileHandle`, `DirHandle`, or `INVALID_HANDLE` */
-		CreateFileW :: proc(lpFileName: CWSTR, dwDesiredAccess: DWORD, dwShareMode: DWORD, lpSecurityAttributes: ^SECURITY_ATTRIBUTES, dwCreationDisposition: DWORD, dwFlagsAndAttributes: DWORD, hTemplateFile: FileHandle = 0) -> FileHandle ---
+		CreateFileW :: proc(wfile_path: CWSTR, access_flags: FileAccessFlags, share_flags: FileShareFlags, security: ^SECURITY_ATTRIBUTES, creation_type: FileCreationType, creation_flags: FileCreationFlags, hTemplateFile: FileHandle = 0) -> FileHandle ---
 		GetFileSizeEx :: proc(file: FileHandle, file_size: ^LARGE_INTEGER) -> BOOL ---
 		ReadFile :: proc(file: FileHandle, buffer: [^]byte, bytes_to_read: DWORD, bytes_read: ^DWORD, overlapped: ^OVERLAPPED) -> BOOL ---
 		WriteFile :: proc(file: FileHandle, buffer: [^]byte, bytes_to_write: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED) -> BOOL ---
@@ -588,16 +587,16 @@ when ODIN_OS == .Windows {
 
 	// procs
 	mkdir :: #force_inline proc(dir_path: cstring, mode: FileMode = 0o755) -> int {
-		result := intrinsics.syscall(linux.SYS_mkdir, transmute(uintptr)(dir_path), uintptr(mode))
+		result := intrinsics.syscall(linux.SYS_mkdir, transmute(uintptr)dir_path, uintptr(mode))
 		return int(result)
 	}
 	renameat2 :: #force_inline proc(src_dir: DirHandle, src_path: cstring, dest_dir: DirHandle, dest_path: cstring, flags: CUINT = 0) -> int {
 		result := intrinsics.syscall(
 			linux.SYS_renameat2,
 			uintptr(src_dir),
-			transmute(uintptr)(src_path),
+			transmute(uintptr)src_path,
 			uintptr(dest_dir),
-			transmute(uintptr)(dest_path),
+			transmute(uintptr)dest_path,
 			uintptr(flags),
 		)
 		return int(result)
@@ -608,7 +607,7 @@ when ODIN_OS == .Windows {
 	}
 	/* Return the new `FileHandle`, `DirHandle`, or `INVALID_HANDLE` */
 	open :: #force_inline proc "system" (path: cstring, flags: FileFlags = {}, mode: FileMode = 0o755) -> FileHandle {
-		result := intrinsics.syscall(linux.SYS_open, transmute(uintptr)(path), uintptr(transmute(CINT)(flags)), uintptr(mode))
+		result := intrinsics.syscall(linux.SYS_open, transmute(uintptr)path, uintptr(transmute(CINT)flags), uintptr(mode))
 		return FileHandle(result)
 	}
 	read :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> int {
@@ -641,7 +640,7 @@ when ODIN_OS == .Windows {
 		file_name:         [1]u16,
 	}
 	WIN32_FIND_DATAW :: struct {
-		dwFileAttributes:   DWORD,
+		dwFileAttributes:   FileCreationFlags,
 		ftCreationTime:     FILETIME,
 		ftLastAccessTime:   FILETIME,
 		ftLastWriteTime:    FILETIME,
@@ -665,12 +664,21 @@ when ODIN_OS == .Windows {
 	}
 
 	// flags
-	FILE_LIST_DIRECTORY: DWORD : 0x00000001
+	FileNotifyFlags :: bit_set[enum {
+		FILE_NOTIFY_CHANGE_FILE_NAME   = 0,
+		FILE_NOTIFY_CHANGE_DIR_NAME    = 1,
+		FILE_NOTIFY_CHANGE_ATTRIBUTES  = 2,
+		FILE_NOTIFY_CHANGE_SIZE        = 3,
+		FILE_NOTIFY_CHANGE_LAST_WRITE  = 4,
+		FILE_NOTIFY_CHANGE_LAST_ACCESS = 5,
+		FILE_NOTIFY_CHANGE_CREATION    = 6,
+		FILE_NOTIFY_CHANGE_SECURITY    = 8,
+	};DWORD]
 
 	// procs
 	@(default_calling_convention = "c")
 	foreign kernel32 {
-		ReadDirectoryChangesW :: proc(dir: DirHandle, buffer: [^]byte, buffer_len: DWORD, subtree: BOOL, filter: DWORD, bytes_returned: ^DWORD, overlapped: ^OVERLAPPED, on_complete: ^OVERLAPPED_COMPLETION_ROUTINE) -> BOOL ---
+		ReadDirectoryChangesW :: proc(dir: DirHandle, buffer: [^]byte, buffer_len: DWORD, subtree: BOOL, filter: FileNotifyFlags, bytes_returned: ^DWORD, overlapped: ^OVERLAPPED, on_complete: ^OVERLAPPED_COMPLETION_ROUTINE) -> BOOL ---
 	}
 } else when ODIN_OS == .Linux {
 	// types
@@ -680,19 +688,40 @@ when ODIN_OS == .Windows {
 	FanotifyClass :: enum {
 		FAN_CLASS_NOTIF = 0x0,
 	}
-	FAN_NONBLOCK :: 0x2
-	FAN_MARK_ADD :: 0x01
-	FAN_MARK_REMOVE :: 0x02
-	FAN_MARK_MOUNT :: 0x10
-	FAN_CLOSE_WRITE :: 0x8
+	FanotifyInitFlags :: bit_set[enum {
+		FAN_NONBLOCK = 1,
+	};CUINT]
+	FanotifyInitEventFlags :: bit_set[enum {};CUINT]
+	FanotifyMarkFlags :: bit_set[enum {
+		FAN_MARK_ADD    = 0,
+		FAN_MARK_REMOVE = 1,
+		/* include subdirectories */
+		FAN_MARK_MOUNT  = 4,
+	};CUINT]
+	FanotifyMarkMask :: bit_set[enum {
+		FAN_CLOSE_WRITE = 3,
+	};u64]
 
 	// procs
-	fanotify_init :: #force_inline proc "system" (init_flags: CUINT, event_flags: CUINT) -> FanotifyHandle {
-		result := intrinsics.syscall(linux.SYS_fanotify_init, uintptr(init_flags), uintptr(event_flags))
+	fanotify_init :: #force_inline proc "system" (init_flags: FanotifyInitFlags, event_flags: FanotifyInitEventFlags) -> FanotifyHandle {
+		result := intrinsics.syscall(linux.SYS_fanotify_init, uintptr(transmute(u32)init_flags), uintptr(transmute(u32)event_flags))
 		return FanotifyHandle(result)
 	}
-	fanotify_mark :: #force_inline proc "system" (fanotify: FanotifyHandle, mark_flags: CUINT, mask: u64, dir: DirHandle, path: cstring) -> int {
-		result := intrinsics.syscall(linux.SYS_fanotify_mark, uintptr(fanotify), uintptr(mark_flags), uintptr(mask), uintptr(dir), transmute(uintptr)(path))
+	fanotify_mark :: #force_inline proc "system" (
+		fanotify: FanotifyHandle,
+		flags: FanotifyMarkFlags,
+		mask: FanotifyMarkMask,
+		dir: DirHandle,
+		path: cstring,
+	) -> int {
+		result := intrinsics.syscall(
+			linux.SYS_fanotify_mark,
+			uintptr(fanotify),
+			uintptr(transmute(CUINT)flags),
+			uintptr(transmute(u64)mask),
+			uintptr(dir),
+			transmute(uintptr)path,
+		)
 		return int(result)
 	}
 } else {
@@ -749,9 +778,9 @@ when ODIN_OS == .Windows {
 	WSADESCRIPTION_LEN :: 256
 	WSASYS_STATUS_LEN :: 128
 
+	IOC_WS2 :: 0x08000000
 	IOC_OUT :: 0x40000000
 	IOC_IN :: 0x80000000
-	IOC_WS2 :: 0x08000000
 	IOC_INOUT :: IOC_IN | IOC_OUT
 	SIO_GET_EXTENSION_FUNCTION_POINTER :: IOC_INOUT | IOC_WS2 | 6
 

@@ -21,7 +21,7 @@ create_dir_if_not_exists :: proc(dir_path: string) {
 }
 move_path_atomically :: proc(src_path, dest_path: string) {
 	when ODIN_OS == .Windows {
-		result := MoveFileExW(&tprint_string_as_wstring(src_path)[0], &tprint_string_as_wstring(dest_path)[0], MOVEFILE_REPLACE_EXISTING)
+		result := MoveFileExW(&tprint_string_as_wstring(src_path)[0], &tprint_string_as_wstring(dest_path)[0], {.MOVEFILE_REPLACE_EXISTING})
 		fmt.assertf(bool(result), "Failed to move path: '%v' to '%v'", src_path, dest_path)
 	} else when ODIN_OS == .Linux {
 		cbuffer: [2 * WINDOWS_MAX_PATH]byte = ---
@@ -51,7 +51,7 @@ walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr),
 				assert(relative_path != "")
 
 				if relative_path != "." && relative_path != ".." {
-					is_dir := (find_result.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY
+					is_dir := find_result.dwFileAttributes >= {.FILE_ATTRIBUTE_DIRECTORY}
 					next_path := fmt.tprint(dir_path, relative_path, sep = "/")
 					if is_dir {
 						walk_files(next_path, callback, data)
@@ -103,7 +103,14 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 	// open file
 	when ODIN_OS == .Windows {
 		wfile_path := tprint_string_as_wstring(file_path)
-		file := CreateFileW(&wfile_path[0], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nil, F_OPEN, FILE_ATTRIBUTE_NORMAL)
+		file := CreateFileW(
+			&wfile_path[0],
+			{.GENERIC_READ},
+			{.FILE_SHARE_READ, .FILE_SHARE_WRITE},
+			nil,
+			.Open,
+			{.FILE_ATTRIBUTE_NORMAL, .FILE_FLAG_SEQUENTIAL_SCAN},
+		)
 		ok = Handle(file) != INVALID_HANDLE
 		if !ok {return}
 	} else when ODIN_OS == .Linux {
@@ -140,7 +147,7 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 }
 open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHandle, ok: bool) {
 	when ODIN_OS == .Windows {
-		file = CreateFileW(&tprint_string_as_wstring(file_path)[0], GENERIC_WRITE, FILE_SHARE_READ, nil, F_CREATE_OR_OPEN_AND_TRUNCATE, FILE_ATTRIBUTE_NORMAL)
+		file = CreateFileW(&tprint_string_as_wstring(file_path)[0], {.GENERIC_WRITE}, {.FILE_SHARE_READ}, nil, .CreateOrOpenAndTruncate, {.FILE_ATTRIBUTE_NORMAL})
 		ok = file != FileHandle(INVALID_HANDLE)
 	} else when ODIN_OS == .Linux {
 		cbuffer: [WINDOWS_MAX_PATH]byte = ---

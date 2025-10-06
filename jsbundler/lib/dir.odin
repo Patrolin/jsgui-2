@@ -26,13 +26,13 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 		// open directory
 		dir.handle = DirHandle(
 			CreateFileW(
-				&tprint_string_as_wstring(dir.path)[0],
-				FILE_LIST_DIRECTORY,
-				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-				nil,
-				F_OPEN,
-				/* NOTE: FILE_FLAG_BACKUP_SEMANTICS is required for directories */
-				FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+			&tprint_string_as_wstring(dir.path)[0],
+			{.FILE_LIST_DIRECTORY},
+			{.FILE_SHARE_READ, .FILE_SHARE_WRITE, .FILE_SHARE_DELETE},
+			nil,
+			.Open,
+			/* NOTE: FILE_FLAG_BACKUP_SEMANTICS is required for directories */
+			{.FILE_FLAG_BACKUP_SEMANTICS, .FILE_FLAG_OVERLAPPED},
 			),
 		)
 		fmt.assertf(dir.handle != DirHandle(INVALID_HANDLE), "Failed to open directory for watching: '%v'", dir.path)
@@ -46,7 +46,7 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 /* NOTE: same caveats as walk_files() */
 ioring_watch_file_changes_async :: proc(ioring: Ioring, dir: ^WatchedDir) {
 	when ODIN_OS == .Windows {
-		ok := ReadDirectoryChangesW(dir.handle, &dir.async_buffer[0], len(dir.async_buffer), true, FILE_NOTIFY_CHANGE_LAST_WRITE, nil, &dir.overlapped, nil)
+		ok := ReadDirectoryChangesW(dir.handle, &dir.async_buffer[0], len(dir.async_buffer), true, {.FILE_NOTIFY_CHANGE_LAST_WRITE}, nil, &dir.overlapped, nil)
 		fmt.assertf(ok == true, "Failed to watch directory for changes")
 	} else when ODIN_OS == .Linux {
 		/* noop */
@@ -67,7 +67,7 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 			wfile_path := tprint_string_as_wstring(file_path)
 
 			// wait for file_size to change..
-			file := CreateFileW(&wfile_path[0], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nil, F_OPEN, FILE_ATTRIBUTE_NORMAL)
+			file := CreateFileW(&wfile_path[0], {.GENERIC_READ}, {.FILE_SHARE_READ, .FILE_SHARE_WRITE, .FILE_SHARE_DELETE}, nil, .Open, {.FILE_ATTRIBUTE_NORMAL})
 			fmt.assertf(file != FileHandle(INVALID_HANDLE), "file: %v, file_path: '%v'", file, file_path)
 			defer close_file(FileHandle(file))
 
@@ -76,6 +76,7 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 			for file_size != prev_file_size {
 				prev_file_size = file_size
 				Sleep(0) /* NOTE: let other threads run first */
+				/* TODO: put open_file_for_reading() and get_file_size() in file.odin */
 				GetFileSizeEx(FileHandle(file), &file_size)
 			}
 

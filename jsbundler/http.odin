@@ -29,7 +29,7 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 		// accept another connection
 		lib.accept_client_async(server)
 	case .Reading:
-		request := transmute(string)(client.async_rw_buffer[:client.async_rw_pos])
+		request := transmute(string)client.async_rw_buffer[:client.async_rw_pos]
 		// send response if valid request
 		if len(request) >= len(GET_START) {
 			if !lib.starts_with(request, GET_START) {
@@ -42,12 +42,8 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 				fmt.assertf(ok, "Failed to open file: '%v'", file_path)
 				// write http headers
 				content_type := "text/html"
-				header := fmt.tprintf(
-					"HTTP/1.1 200 OK\r\nContent-Length: %v\r\nContent-Type: %v\r\nConnection: close\r\n\r\n",
-					file_size,
-					content_type,
-				)
-				lib.send_file_response_and_close_client(client, transmute([]byte)(header))
+				header := fmt.tprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\nContent-Type: %v\r\nConnection: close\r\n\r\n", file_size, content_type)
+				lib.send_file_response_and_close_client(client, transmute([]byte)header)
 				return
 			}
 		}
