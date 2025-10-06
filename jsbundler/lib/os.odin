@@ -22,7 +22,6 @@ when ODIN_OS == .Windows {
 
 	// flags
 	INFINITE :: max(u32)
-
 	CodePage :: enum CUINT {
 		CP_UTF8 = 65001,
 	}
@@ -293,10 +292,10 @@ when ODIN_OS == .Windows {
 // alloc
 when ODIN_OS == .Windows {
 	// types
-	EXCEPTION_MAXIMUM_PARAMETERS :: 15
 	ExceptionCode :: enum DWORD {
 		EXCEPTION_ACCESS_VIOLATION = 0xC0000005,
 	}
+	EXCEPTION_MAXIMUM_PARAMETERS :: 15
 	EXCEPTION_RECORD :: struct {
 		ExceptionCode:        ExceptionCode,
 		ExceptionFlags:       DWORD,
@@ -338,26 +337,29 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	// flags
-	PROT_NONE :: 0x0
-	PROT_EXEC :: 0x1
-	PROT_READ :: 0x2
-	PROT_WRITE :: 0x4
-
-	MAP_PRIVATE :: 0x02
-	MAP_ANONYMOUS :: 0x20
+	AllocProtectFlags :: bit_set[enum {
+		PROT_EXEC  = 0,
+		PROT_READ  = 1,
+		PROT_WRITE = 2,
+	};CINT]
+	AllocTypeFlags :: bit_set[enum {
+		MAP_PRIVATE   = 1,
+		MAP_ANONYMOUS = 5,
+	};CINT]
 
 	// procs
 	mmap :: #force_inline proc "system" (
-		addr: rawptr,
+		address: rawptr,
 		size: Size,
-		prot, flags: CINT,
+		protect_flags: AllocProtectFlags,
+		type_flags: AllocTypeFlags,
 		file: FileHandle = max(FileHandle),
 		offset: uint = 0,
 	) -> uintptr {
-		return intrinsics.syscall(linux.SYS_mmap, uintptr(addr), uintptr(size), uintptr(prot), uintptr(flags), uintptr(file), uintptr(offset))
+		return intrinsics.syscall(linux.SYS_mmap, uintptr(address), uintptr(size), uintptr(protect_flags), uintptr(type_flags), uintptr(file), uintptr(offset))
 	}
-	munmap :: #force_inline proc(addr: rawptr, size: Size) -> uintptr {
-		return intrinsics.syscall(linux.SYS_munmap, uintptr(addr), uintptr(size))
+	munmap :: #force_inline proc(address: rawptr, size: Size) -> uintptr {
+		return intrinsics.syscall(linux.SYS_munmap, uintptr(address), uintptr(size))
 	}
 } else {
 	//#assert(false)
@@ -383,6 +385,8 @@ when ODIN_OS == .Windows {
 	TimerQueueHandle :: distinct Handle
 	TimerHandle :: distinct Handle
 	WAITORTIMERCALLBACK :: proc "system" (user_ptr: rawptr, TimerOrWaitFired: BOOL)
+
+	// flags
 	TimerFlags :: bit_set[enum {
 		WT_EXECUTEONLYONCE = 3,
 	};CULONG]
@@ -444,12 +448,7 @@ when ODIN_OS == .Windows {
 	timerfd_create :: #force_inline proc "system" (type: ClockType, flags: CINT) -> TimerHandle {
 		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(flags)))
 	}
-	timerfd_settime64 :: #force_inline proc "system" (
-		timer: TimerHandle,
-		flags: CINT,
-		options: ^TimerOptions64,
-		old_options: ^TimerOptions64 = nil,
-	) -> int {
+	timerfd_settime64 :: #force_inline proc "system" (timer: TimerHandle, flags: CINT, options: ^TimerOptions64, old_options: ^TimerOptions64 = nil) -> int {
 		when IS_64BIT {
 			syscall_id := linux.SYS_timerfd_settime
 		} else {
@@ -540,13 +539,7 @@ when ODIN_OS == .Windows {
 		result := intrinsics.syscall(linux.SYS_mkdir, transmute(uintptr)(dir_path), uintptr(mode))
 		return int(result)
 	}
-	renameat2 :: #force_inline proc(
-		src_dir: DirHandle,
-		src_path: cstring,
-		dest_dir: DirHandle,
-		dest_path: cstring,
-		flags: CUINT = 0,
-	) -> int {
+	renameat2 :: #force_inline proc(src_dir: DirHandle, src_path: cstring, dest_dir: DirHandle, dest_path: cstring, flags: CUINT = 0) -> int {
 		result := intrinsics.syscall(
 			linux.SYS_renameat2,
 			uintptr(src_dir),
@@ -629,21 +622,8 @@ when ODIN_OS == .Windows {
 		result := intrinsics.syscall(linux.SYS_fanotify_init, uintptr(init_flags), uintptr(event_flags))
 		return FanotifyHandle(result)
 	}
-	fanotify_mark :: #force_inline proc "system" (
-		fanotify: FanotifyHandle,
-		mark_flags: CUINT,
-		mask: u64,
-		dir: DirHandle,
-		path: cstring,
-	) -> int {
-		result := intrinsics.syscall(
-			linux.SYS_fanotify_mark,
-			uintptr(fanotify),
-			uintptr(mark_flags),
-			uintptr(mask),
-			uintptr(dir),
-			transmute(uintptr)(path),
-		)
+	fanotify_mark :: #force_inline proc "system" (fanotify: FanotifyHandle, mark_flags: CUINT, mask: u64, dir: DirHandle, path: cstring) -> int {
+		result := intrinsics.syscall(linux.SYS_fanotify_mark, uintptr(fanotify), uintptr(mark_flags), uintptr(mask), uintptr(dir), transmute(uintptr)(path))
 		return int(result)
 	}
 } else {
@@ -710,9 +690,12 @@ when ODIN_OS == .Windows {
 		WSA_FLAG_OVERLAPPED = 0,
 	};DWORD]
 
-	WSAID_ACCEPTEX :: GUID{0xb5367df1, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
-	WSAID_GETACCEPTEXSOCKADDRS :: GUID{0xb5367df2, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
-	WSAID_CONNECTX :: GUID{0x25a207b9, 0xddf3, 0x4660, {0x8e, 0xe9, 0x76, 0xe5, 0x8c, 0x74, 0x06, 0x3e}}
+	@(rodata)
+	WSAID_ACCEPTEX := GUID{0xb5367df1, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
+	@(rodata)
+	WSAID_GETACCEPTEXSOCKADDRS := GUID{0xb5367df2, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
+	@(rodata)
+	WSAID_CONNECTX := GUID{0x25a207b9, 0xddf3, 0x4660, {0x8e, 0xe9, 0x76, 0xe5, 0x8c, 0x74, 0x06, 0x3e}}
 
 	WinsockGroup :: enum CUINT {
 		None                   = 0x0,
@@ -727,14 +710,16 @@ when ODIN_OS == .Windows {
 	foreign winsock_lib {
 		WSAStartup :: proc(requested_version: WORD, winsock: ^WinsockData) -> CINT ---
 		WSAIoctl :: proc(socket: SocketHandle, control_code: DWORD, in_buf: rawptr, in_len: DWORD, out_buf: rawptr, out_len: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
-		WSASocketW :: proc(address_type, connection_type, protocol: CINT, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
-		WSARecv :: proc(socket: SocketHandle, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
 
-		socket :: proc(address_type, connection_type, protocol: CINT) -> SocketHandle ---
+		/* TODO: only use WSASocketW() */
+		/* Returns a new `SocketHandle`, or `INVALID_HANDLE` */
+		WSASocketW :: proc(address_type, connection_type, protocol: CINT, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
 		bind :: proc(socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> CINT ---
 		listen :: proc(socket: SocketHandle, max_connections: CINT) -> CINT ---
-		closesocket :: proc(socket: SocketHandle) -> CINT ---
+
 		setsockopt :: proc(socket: SocketHandle, level: CINT, optname: CINT, optval: rawptr, optlen: CINT) -> CINT ---
+		WSARecv :: proc(socket: SocketHandle, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
+		closesocket :: proc(socket: SocketHandle) -> CINT ---
 
 		WSAGetLastError :: proc() -> OsError ---
 	}

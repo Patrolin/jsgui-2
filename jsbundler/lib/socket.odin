@@ -89,27 +89,25 @@ create_server_socket :: proc(server: ^Server, port: u16) {
 		ip     = u32be(0), // NOTE: 0.0.0.0
 		port   = u16be(port),
 	}
-	server.socket = socket(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP)
-	fmt.assertf(server.socket != INVALID_SOCKET, "Failed to create a server socket")
-
-	fmt.assertf(bind(server.socket, &server.address, size_of(SocketAddressIpv4)) == 0, "Failed to bind the server socket")
-
-	fmt.assertf(listen(server.socket, SOMAXCONN) == 0, "Failed to listen to the server socket")
-
 	when ODIN_OS == .Windows {
-		fmt.assertf(
-			CreateIoCompletionPort(Handle(server.socket), server.ioring, 0, 0) == server.ioring,
-			"Failed to listen to the server socket via IOCP",
-		)
-
-		accept_ex_guid := WSAID_ACCEPTEX
+		server.socket = WSASocketW(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP, nil, .None, {.WSA_FLAG_OVERLAPPED})
+	} else when ODIN_OS == .Linux {
+		server.socket = socket(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP)
+	} else {
+		assert(false)
+	}
+	fmt.assertf(server.socket != INVALID_SOCKET, "Failed to create a server socket")
+	fmt.assertf(bind(server.socket, &server.address, size_of(SocketAddressIpv4)) == 0, "Failed to bind the server socket")
+	fmt.assertf(listen(server.socket, SOMAXCONN) == 0, "Failed to listen to the server socket")
+	when ODIN_OS == .Windows {
+		fmt.assertf(CreateIoCompletionPort(Handle(server.socket), server.ioring, 0, 0) == server.ioring, "Failed to listen to the server socket via IOCP")
 		bytes_written: u32 = 0
 		fmt.assertf(
 			WSAIoctl(
 				server.socket,
 				SIO_GET_EXTENSION_FUNCTION_POINTER,
-				&accept_ex_guid,
-				size_of(accept_ex_guid),
+				&WSAID_ACCEPTEX,
+				size_of(WSAID_ACCEPTEX),
 				&server.AcceptEx,
 				size_of(server.AcceptEx),
 				&bytes_written,
@@ -174,14 +172,7 @@ open_file_for_response :: proc(client: ^Client, file_path: string) -> (file_size
 	when ODIN_OS == .Windows {
 		wfile_path := &tprint_string_as_wstring(file_path, allocator = context.allocator)[0]
 		file = FileHandle(
-			CreateFileW(
-				wfile_path,
-				GENERIC_READ,
-				FILE_SHARE_READ | FILE_SHARE_WRITE,
-				nil,
-				F_OPEN,
-				FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
-			),
+			CreateFileW(wfile_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nil, F_OPEN, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN),
 		)
 		win_file_size: LARGE_INTEGER = ---
 		fmt.assertf(GetFileSizeEx(file, &win_file_size) == true, "Failed to get file size")
@@ -212,15 +203,7 @@ send_file_response_and_close_client :: proc(client: ^Client, header: []byte) {
 
 	when ODIN_OS == .Windows {
 		client.overlapped = {}
-		ok := TransmitFile(
-			client.socket,
-			client.async_write_file,
-			0,
-			0,
-			&client.overlapped,
-			&client.async_write_slice,
-			{.TF_DISCONNECT, .TF_REUSE_SOCKET},
-		)
+		ok := TransmitFile(client.socket, client.async_write_file, 0, 0, &client.overlapped, &client.async_write_slice, {.TF_DISCONNECT, .TF_REUSE_SOCKET})
 		err := WSAGetLastError()
 		fmt.assertf(ok == true || err == .ERROR_IO_PENDING, "Failed to send response, err: %v", err)
 	} else {
@@ -278,10 +261,7 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 		} else {
 			assert(false)
 		}
-		fmt.assertf(
-			setsockopt(client.socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, &server.socket, size_of(SocketHandle)) == 0,
-			"Failed to set client params",
-		)
+		fmt.assertf(setsockopt(client.socket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, &server.socket, size_of(SocketHandle)) == 0, "Failed to set client params")
 		/* NOTE: IOCP is badly designed, see ioring_set_timer_async() */
 		on_timeout :: proc "system" (user_ptr: rawptr, _TimerOrWaitFired: b32) {
 			when ODIN_OS == .Windows {

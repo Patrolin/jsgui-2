@@ -8,18 +8,16 @@ DEBUG_VIRTUAL :: false
 init_page_fault_handler :: proc "contextless" () {
 	when ODIN_OS == .Windows {
 		_page_fault_exception_handler :: proc "system" (exception: ^_EXCEPTION_POINTERS) -> ExceptionResult {
+			exception_code := exception.ExceptionRecord.ExceptionCode
 			when DEBUG_VIRTUAL {
 				context = runtime.default_context()
-				fmt.printfln(
-					"exception %v: %v",
-					exception.ExceptionRecord.ExceptionCode,
-					exception.ExceptionRecord.ExceptionInformation[:exception.ExceptionRecord.NumberParameters],
-				)
+				exception_params := exception.ExceptionRecord.ExceptionInformation[:exception.ExceptionRecord.NumberParameters]
+				fmt.printfln("exception %v: %v", exception_code, exception_params)
 			}
-			if exception.ExceptionRecord.ExceptionCode == .EXCEPTION_ACCESS_VIOLATION {
+			if exception_code == .EXCEPTION_ACCESS_VIOLATION {
 				ptr := exception.ExceptionRecord.ExceptionInformation[1]
 				page_ptr := rawptr(uintptr(ptr) & ~uintptr(PAGE_SIZE - 1))
-				commited_ptr := VirtualAlloc(page_ptr, 4096, {.MEM_COMMIT}, {.PAGE_READWRITE})
+				commited_ptr := VirtualAlloc(page_ptr, PAGE_SIZE, {.MEM_COMMIT}, {.PAGE_READWRITE})
 				return page_ptr != nil && commited_ptr != nil ? .EXCEPTION_CONTINUE_EXECUTION : .EXCEPTION_EXECUTE_HANDLER
 			}
 			return .EXCEPTION_EXECUTE_HANDLER

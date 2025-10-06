@@ -10,13 +10,16 @@ VIRTUAL_MEMORY_TO_RESERVE :: 1 << 16
 
 PAGE_SIZE_EXPONENT :: 12
 PAGE_SIZE :: 1 << PAGE_SIZE_EXPONENT
+#assert(PAGE_SIZE == 4096)
 
 HUGE_PAGE_SIZE_EXPONENT :: 21
 HUGE_PAGE_SIZE :: 1 << HUGE_PAGE_SIZE_EXPONENT
+#assert(HUGE_PAGE_SIZE == 2_097_152)
 
 // NOTE: multiple threads reading from the same cache line is fine, but writing can lead to false sharing
 CACHE_LINE_SIZE_EXPONENT :: 6
 CACHE_LINE_SIZE :: 1 << CACHE_LINE_SIZE_EXPONENT
+#assert(CACHE_LINE_SIZE == 64)
 
 // types
 Lock :: distinct bool
