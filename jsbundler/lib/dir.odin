@@ -68,7 +68,7 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 
 			// wait for file_size to change..
 			file := CreateFileW(&wfile_path[0], GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nil, F_OPEN, FILE_ATTRIBUTE_NORMAL)
-			fmt.assertf(file != INVALID_HANDLE, "file: %v, file_path: '%v'", file, file_path)
+			fmt.assertf(file != FileHandle(INVALID_HANDLE), "file: %v, file_path: '%v'", file, file_path)
 			defer close_file(FileHandle(file))
 
 			prev_file_size: LARGE_INTEGER = -1

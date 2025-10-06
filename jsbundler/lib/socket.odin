@@ -184,9 +184,7 @@ open_file_for_response :: proc(client: ^Client, file_path: string) -> (file_size
 	file := FileHandle(INVALID_HANDLE)
 	when ODIN_OS == .Windows {
 		wfile_path := &tprint_string_as_wstring(file_path, allocator = context.allocator)[0]
-		file = FileHandle(
-			CreateFileW(wfile_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nil, F_OPEN, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN),
-		)
+		file = CreateFileW(wfile_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nil, F_OPEN, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN)
 		win_file_size: LARGE_INTEGER = ---
 		fmt.assertf(GetFileSizeEx(file, &win_file_size) == true, "Failed to get file size")
 		file_size = int(win_file_size)

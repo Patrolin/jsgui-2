@@ -140,9 +140,7 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 }
 open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHandle, ok: bool) {
 	when ODIN_OS == .Windows {
-		file = FileHandle(
-			CreateFileW(&tprint_string_as_wstring(file_path)[0], GENERIC_WRITE, FILE_SHARE_READ, nil, F_CREATE_OR_OPEN_AND_TRUNCATE, FILE_ATTRIBUTE_NORMAL),
-		)
+		file = CreateFileW(&tprint_string_as_wstring(file_path)[0], GENERIC_WRITE, FILE_SHARE_READ, nil, F_CREATE_OR_OPEN_AND_TRUNCATE, FILE_ATTRIBUTE_NORMAL)
 		ok = file != FileHandle(INVALID_HANDLE)
 	} else {
 		assert(false)
