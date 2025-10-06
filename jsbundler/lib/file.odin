@@ -107,7 +107,7 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 		ok = Handle(file) != INVALID_HANDLE
 		if !ok {return}
 	} else when ODIN_OS == .Linux {
-		cbuffer: [WINDOWS_MAX_PATH]byte
+		cbuffer: [WINDOWS_MAX_PATH]byte = ---
 		cfile_path, _ := copy_to_cstring(file_path, cbuffer[:])
 		file := open(cfile_path)
 		ok = Handle(file) != INVALID_HANDLE
@@ -142,6 +142,11 @@ open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHand
 	when ODIN_OS == .Windows {
 		file = CreateFileW(&tprint_string_as_wstring(file_path)[0], GENERIC_WRITE, FILE_SHARE_READ, nil, F_CREATE_OR_OPEN_AND_TRUNCATE, FILE_ATTRIBUTE_NORMAL)
 		ok = file != FileHandle(INVALID_HANDLE)
+	} else when ODIN_OS == .Linux {
+		cbuffer: [WINDOWS_MAX_PATH]byte = ---
+		cfile_path, _ := copy_to_cstring(file_path, cbuffer[:])
+		file = open(cfile_path, {.O_CREAT, .O_WRONLY, .O_TRUNC})
+		ok = file != FileHandle(INVALID_HANDLE)
 	} else {
 		assert(false)
 	}
@@ -153,13 +158,18 @@ write_to_file :: proc(file: FileHandle, text: string) {
 		bytes_written: DWORD
 		WriteFile(file, raw_data(text), u32(len(text)), &bytes_written, nil)
 		assert(int(bytes_written) == len(text))
+	} else when ODIN_OS == .Linux {
+		bytes_written := write(file, raw_data(text), len(text))
+		assert(bytes_written == len(text))
 	} else {
 		assert(false)
 	}
 }
 flush_file :: proc(file: FileHandle) {
 	when ODIN_OS == .Windows {
-		FlushFileBuffers(file)
+		assert(bool(FlushFileBuffers(file)))
+	} else when ODIN_OS == .Linux {
+		assert(fsync(file) == 0)
 	} else {
 		assert(false)
 	}
@@ -167,6 +177,8 @@ flush_file :: proc(file: FileHandle) {
 close_file :: proc(file: FileHandle) {
 	when ODIN_OS == .Windows {
 		CloseHandle(Handle(file))
+	} else when ODIN_OS == .Linux {
+		close_handle(Handle(file))
 	} else {
 		assert(false)
 	}

@@ -10,7 +10,7 @@ import "lib"
 
 // params
 SERVE_THREAD_COUNT :: 1
-PRINT_REBUILD :: false
+PRINT_REBUILD :: true
 
 // globals
 global_serve_enabled := true
@@ -116,6 +116,7 @@ main :: proc() {
 		serve_http_or_rebuild(&server)
 	} else {
 		rebuild_index_file()
+		fmt.println()
 	}
 }
 serve_http_or_rebuild_proc :: proc "system" (user_data: rawptr) -> (return_code: u32) {
@@ -153,8 +154,8 @@ serve_http_or_rebuild :: proc(server: ^lib.Server) {
 rebuild_index_file :: proc() {
 	when PRINT_REBUILD {fmt.print("\r- Rebuilding...")}
 	WalkData :: struct {
-		css_texts: [dynamic]string,
-		js_texts:  [dynamic]string,
+		css_texts: [dynamic]string `fmt:"-"`,
+		js_texts:  [dynamic]string `fmt:"-"`,
 	}
 	walk_data: WalkData
 	walk_proc :: proc(next_path: string, user_data: rawptr) {

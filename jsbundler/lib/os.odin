@@ -497,6 +497,7 @@ when ODIN_OS == .Windows {
 	FindFile :: distinct Handle
 
 	// flags
+	/* TODO: bitsets for file flags */
 	MOVEFILE_REPLACE_EXISTING :: 1
 
 	GENERIC_READ: DWORD : 0x80000000
@@ -576,6 +577,12 @@ when ODIN_OS == .Windows {
 	FileFlags :: bit_set[enum {
 		O_WRONLY    = 0,
 		O_RDWR      = 1,
+		/* create if not exists */
+		O_CREAT     = 6,
+		/* don't open */
+		O_EXCL      = 7,
+		/* truncate */
+		O_TRUNC     = 9,
 		O_DIRECTORY = 16,
 	};CINT]
 
@@ -606,6 +613,18 @@ when ODIN_OS == .Windows {
 	}
 	read :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> int {
 		result := intrinsics.syscall(linux.SYS_read, uintptr(file), uintptr(buffer), uintptr(buffer_size))
+		return int(result)
+	}
+	write :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> int {
+		result := intrinsics.syscall(linux.SYS_write, uintptr(file), uintptr(buffer), uintptr(buffer_size))
+		return int(result)
+	}
+	fsync :: #force_inline proc "system" (file: FileHandle) -> int {
+		result := intrinsics.syscall(linux.SYS_fsync, uintptr(file))
+		return int(result)
+	}
+	fdatasync :: #force_inline proc "system" (file: FileHandle) -> int {
+		result := intrinsics.syscall(linux.SYS_fdatasync, uintptr(file))
 		return int(result)
 	}
 } else {
