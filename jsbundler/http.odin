@@ -21,6 +21,7 @@ get_http :: proc() {
 */
 serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 	client := lib.handle_socket_event(server, event)
+	fmt.printfln("client: %v", client)
 	switch client.state {
 	case .New:
 		// start reading data

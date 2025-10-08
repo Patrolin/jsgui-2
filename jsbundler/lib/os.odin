@@ -21,7 +21,6 @@ when ODIN_OS == .Windows {
 	ULONG_PTR :: uintptr
 
 	// flags
-	INFINITE :: max(u32)
 	CodePage :: enum CUINT {
 		CP_UTF8 = 65001,
 	}
@@ -38,6 +37,7 @@ when ODIN_OS == .Windows {
 		ERROR_IO_PENDING         = 997,
 		ERROR_CONNECTION_ABORTED = 1236,
 	}
+	Errno :: int /* NOTE: for sharing socket code */
 
 	// procs
 	foreign import kernel32 "system:Kernel32.lib"
@@ -97,145 +97,146 @@ when ODIN_OS == .Windows {
 	/* NOTE: linux ships on many architectures, and SYS_XXX probably depends on architecture */
 
 	// flags
-	ERR_NONE :: int(0)
-	ERR_PERM :: int(-1)
-	ERR_NOENT :: int(-2)
-	ERR_SRCH :: int(-3)
-	ERR_INTR :: int(-4)
-	ERR_IO :: int(-5)
-	ERR_NXIO :: int(-6)
-	ERR_2BIG :: int(-7)
-	ERR_NOEXEC :: int(-8)
-	ERR_BADF :: int(-9)
-	ERR_CHILD :: int(-10)
-	ERR_AGAIN :: int(-11)
-	ERR_WOULDBLOCK :: ERR_AGAIN
-	ERR_NOMEM :: int(-12)
-	ERR_ACCES :: int(-13)
-	ERR_FAULT :: int(-14)
-	ERR_NOTBLK :: int(-15)
-	ERR_BUSY :: int(-16)
-	ERR_EXIST :: int(-17)
-	ERR_XDEV :: int(-18)
-	ERR_NODEV :: int(-19)
-	ERR_NOTDIR :: int(-20)
-	ERR_ISDIR :: int(-21)
-	ERR_INVAL :: int(-22)
-	ERR_NFILE :: int(-23)
-	ERR_MFILE :: int(-24)
-	ERR_NOTTY :: int(-25)
-	ERR_TXTBSY :: int(-26)
-	ERR_FBIG :: int(-27)
-	ERR_NOSPC :: int(-28)
-	ERR_SPIPE :: int(-29)
-	ERR_ROFS :: int(-30)
-	ERR_MLINK :: int(-31)
-	ERR_PIPE :: int(-32)
-	ERR_DOM :: int(-33)
-	ERR_RANGE :: int(-34)
-
-	ERR_DEADLOCK :: int(-35)
-	ERR_NAMETOOLONG :: int(-36)
-	ERR_NOLCK :: int(-37)
-	ERR_NOSYS :: int(-38)
-	ERR_NOTEMPTY :: int(-39)
-	ERR_LOOP :: int(-40)
-	ERR_UNKNOWN_41 :: int(-41)
-	ERR_NOMSG :: int(-42)
-	ERR_IDRM :: int(-43)
-	ERR_CHRNG :: int(-44)
-	ERR_L2NSYNC :: int(-45)
-	ERR_L3HLT :: int(-46)
-	ERR_L3RST :: int(-47)
-	ERR_LNRNG :: int(-48)
-	ERR_UNATCH :: int(-49)
-	ERR_NOCSI :: int(-50)
-	ERR_L2HLT :: int(-51)
-	ERR_BADE :: int(-52)
-	ERR_BADR :: int(-53)
-	ERR_XFULL :: int(-54)
-	ERR_NOANO :: int(-55)
-	ERR_BADRQC :: int(-56)
-	ERR_BADSLT :: int(-57)
-	ERR_UNKNOWN_58 :: int(-58)
-	ERR_BFONT :: int(-59)
-	ERR_NOSTR :: int(-60)
-	ERR_NODATA :: int(-61)
-	ERR_TIME :: int(-62)
-	ERR_NOSR :: int(-63)
-	ERR_NONET :: int(-64)
-	ERR_NOPKG :: int(-65)
-	ERR_REMOTE :: int(-66)
-	ERR_NOLINK :: int(-67)
-	ERR_ADV :: int(-68)
-	ERR_SRMNT :: int(-69)
-	ERR_COMM :: int(-70)
-	ERR_PROTO :: int(-71)
-	ERR_MULTIHOP :: int(-72)
-	ERR_DOTDOT :: int(-73)
-	ERR_BADMSG :: int(-74)
-	ERR_OVERFLOW :: int(-75)
-	ERR_NOTUNIQ :: int(-76)
-	ERR_BADFD :: int(-77)
-	ERR_REMCHG :: int(-78)
-	ERR_LIBACC :: int(-79)
-	ERR_LIBBAD :: int(-80)
-	ERR_LIBSCN :: int(-81)
-	ERR_LIBMAX :: int(-82)
-	ERR_LIBEXEC :: int(-83)
-	ERR_ILSEQ :: int(-84)
-	ERR_RESTART :: int(-85)
-	ERR_STRPIPE :: int(-86)
-	ERR_USERS :: int(-87)
-	ERR_NOTSOCK :: int(-88)
-	ERR_DESTADDRREQ :: int(-89)
-	ERR_MSGSIZE :: int(-90)
-	ERR_PROTOTYPE :: int(-91)
-	ERR_NOPROTOOPT :: int(-92)
-	ERR_PROTONOSUPPORT :: int(-93)
-	ERR_SOCKTNOSUPPORT :: int(-94)
-	ERR_OPNOTSUPP :: int(-95)
-	ERR_PFNOSUPPORT :: int(-96)
-	ERR_AFNOSUPPORT :: int(-97)
-	ERR_ADDRINUSE :: int(-98)
-	ERR_ADDRNOTAVAIL :: int(-99)
-	ERR_NETDOWN :: int(-100)
-	ERR_NETUNREACH :: int(-101)
-	ERR_NETRESET :: int(-102)
-	ERR_CONNABORTED :: int(-103)
-	ERR_CONNRESET :: int(-104)
-	ERR_NOBUFS :: int(-105)
-	ERR_ISCONN :: int(-106)
-	ERR_NOTCONN :: int(-107)
-	ERR_SHUTDOWN :: int(-108)
-	ERR_TOOMANYREFS :: int(-109)
-	ERR_TIMEDOUT :: int(-110)
-	ERR_CONNREFUSED :: int(-111)
-	ERR_HOSTDOWN :: int(-112)
-	ERR_HOSTUNREACH :: int(-113)
-	ERR_ALREADY :: int(-114)
-	ERR_INPROGRESS :: int(-115)
-	ERR_STALE :: int(-116)
-	ERR_UCLEAN :: int(-117)
-	ERR_NOTNAM :: int(-118)
-	ERR_NAVAIL :: int(-119)
-	ERR_ISNAM :: int(-120)
-	ERR_REMOTEIO :: int(-121)
-	ERR_DQUOT :: int(-122)
-	ERR_NOMEDIUM :: int(-123)
-	ERR_MEDIUMTYPE :: int(-124)
-	ERR_CANCELED :: int(-125)
-	ERR_NOKEY :: int(-126)
-	ERR_KEYEXPIRED :: int(-127)
-	ERR_KEYREVOKED :: int(-128)
-	ERR_KEYREJECTED :: int(-129)
-	ERR_OWNERDEAD :: int(-130)
-	ERR_NOTRECOVERABLE :: int(-131)
-	ERR_RFKILL :: int(-132)
-	ERR_HWPOISON :: int(-133)
+	Errno :: enum int {
+		EPERM           = int(-1),
+		ENOENT          = int(-2),
+		ESRCH           = int(-3),
+		EINTR           = int(-4),
+		EIO             = int(-5),
+		ENXIO           = int(-6),
+		E2BIG           = int(-7),
+		ENOEXEC         = int(-8),
+		EBADF           = int(-9),
+		ECHILD          = int(-10),
+		EAGAIN          = int(-11),
+		/* NOTE: on linux these have the same value */
+		EWOULDBLOCK     = EAGAIN,
+		ENOMEM          = int(-12),
+		EACCES          = int(-13),
+		EFAULT          = int(-14),
+		ENOTBLK         = int(-15),
+		EBUSY           = int(-16),
+		EEXIST          = int(-17),
+		EXDEV           = int(-18),
+		ENODEV          = int(-19),
+		ENOTDIR         = int(-20),
+		EISDIR          = int(-21),
+		EINVAL          = int(-22),
+		ENFILE          = int(-23),
+		EMFILE          = int(-24),
+		ENOTTY          = int(-25),
+		ETXTBSY         = int(-26),
+		EFBIG           = int(-27),
+		ENOSPC          = int(-28),
+		ESPIPE          = int(-29),
+		EROFS           = int(-30),
+		EMLINK          = int(-31),
+		EPIPE           = int(-32),
+		EDOM            = int(-33),
+		ERANGE          = int(-34),
+		EDEADLOCK       = int(-35),
+		ENAMETOOLONG    = int(-36),
+		ENOLCK          = int(-37),
+		ENOSYS          = int(-38),
+		ENOTEMPTY       = int(-39),
+		ELOOP           = int(-40),
+		EUNKNOWN_41     = int(-41),
+		ENOMSG          = int(-42),
+		EIDRM           = int(-43),
+		ECHRNG          = int(-44),
+		EL2NSYNC        = int(-45),
+		EL3HLT          = int(-46),
+		EL3RST          = int(-47),
+		ELNRNG          = int(-48),
+		EUNATCH         = int(-49),
+		ENOCSI          = int(-50),
+		EL2HLT          = int(-51),
+		EBADE           = int(-52),
+		EBADR           = int(-53),
+		EXFULL          = int(-54),
+		ENOANO          = int(-55),
+		EBADRQC         = int(-56),
+		EBADSLT         = int(-57),
+		EUNKNOWN_58     = int(-58),
+		EBFONT          = int(-59),
+		ENOSTR          = int(-60),
+		ENODATA         = int(-61),
+		ETIME           = int(-62),
+		ENOSR           = int(-63),
+		ENONET          = int(-64),
+		ENOPKG          = int(-65),
+		EREMOTE         = int(-66),
+		ENOLINK         = int(-67),
+		EADV            = int(-68),
+		ESRMNT          = int(-69),
+		ECOMM           = int(-70),
+		EPROTO          = int(-71),
+		EMULTIHOP       = int(-72),
+		EDOTDOT         = int(-73),
+		EBADMSG         = int(-74),
+		EOVERFLOW       = int(-75),
+		ENOTUNIQ        = int(-76),
+		EBADFD          = int(-77),
+		EREMCHG         = int(-78),
+		ELIBACC         = int(-79),
+		ELIBBAD         = int(-80),
+		ELIBSCN         = int(-81),
+		ELIBMAX         = int(-82),
+		ELIBEXEC        = int(-83),
+		EILSEQ          = int(-84),
+		ERESTART        = int(-85),
+		ESTRPIPE        = int(-86),
+		EUSERS          = int(-87),
+		ENOTSOCK        = int(-88),
+		EDESTADDRREQ    = int(-89),
+		EMSGSIZE        = int(-90),
+		EPROTOTYPE      = int(-91),
+		ENOPROTOOPT     = int(-92),
+		EPROTONOSUPPORT = int(-93),
+		ESOCKTNOSUPPORT = int(-94),
+		EOPNOTSUPP      = int(-95),
+		EPFNOSUPPORT    = int(-96),
+		EAFNOSUPPORT    = int(-97),
+		EADDRINUSE      = int(-98),
+		EADDRNOTAVAIL   = int(-99),
+		ENETDOWN        = int(-100),
+		ENETUNREACH     = int(-101),
+		ENETRESET       = int(-102),
+		ECONNABORTED    = int(-103),
+		ECONNRESET      = int(-104),
+		ENOBUFS         = int(-105),
+		EISCONN         = int(-106),
+		ENOTCONN        = int(-107),
+		ESHUTDOWN       = int(-108),
+		ETOOMANYREFS    = int(-109),
+		ETIMEDOUT       = int(-110),
+		ECONNREFUSED    = int(-111),
+		EHOSTDOWN       = int(-112),
+		EHOSTUNREACH    = int(-113),
+		EALREADY        = int(-114),
+		EINPROGRESS     = int(-115),
+		ESTALE          = int(-116),
+		EUCLEAN         = int(-117),
+		ENOTNAM         = int(-118),
+		ENAVAIL         = int(-119),
+		EISNAM          = int(-120),
+		EREMOTEIO       = int(-121),
+		EDQUOT          = int(-122),
+		ENOMEDIUM       = int(-123),
+		EMEDIUMTYPE     = int(-124),
+		ECANCELED       = int(-125),
+		ENOKEY          = int(-126),
+		EKEYEXPIRED     = int(-127),
+		EKEYREVOKED     = int(-128),
+		EKEYREJECTED    = int(-129),
+		EOWNERDEAD      = int(-130),
+		ENOTRECOVERABLE = int(-131),
+		ERFKILL         = int(-132),
+		EHWPOISON       = int(-133),
+	}
 
 	// procs
-	close_handle :: #force_inline proc "system" (handle: Handle) -> int {
+	close_handle :: #force_inline proc "system" (handle: Handle) -> (errno: int) {
 		return int(intrinsics.syscall(linux.SYS_close, uintptr(handle)))
 	}
 	@(require_results)
@@ -415,7 +416,7 @@ when ODIN_OS == .Windows {
 		/* NOTE: Return the new `IocpHandle`, or `0` */
 		CreateIoCompletionPort :: proc(file: Handle, existing_iocp: IocpHandle, completion_key: ULONG_PTR, max_threads: DWORD) -> IocpHandle ---
 		PostQueuedCompletionStatus :: proc(iocp: IocpHandle, bytes_transferred: DWORD, completion_key: ULONG_PTR, overlapped: ^OVERLAPPED) -> BOOL ---
-		GetQueuedCompletionStatus :: proc(iocp: IocpHandle, bytes_transferred: ^DWORD, completion_key: ^ULONG_PTR, overlapped: ^^OVERLAPPED, millis: DWORD) -> BOOL ---
+		GetQueuedCompletionStatus :: proc(iocp: IocpHandle, bytes_transferred: ^DWORD, completion_key: ^ULONG_PTR, overlapped: ^^OVERLAPPED, timeout_ms: DWORD = max(DWORD)) -> BOOL ---
 		CreateTimerQueueTimer :: proc(timer: ^TimerHandle, timer_queue: TimerQueueHandle, timer_callback: WAITORTIMERCALLBACK, user_ptr: rawptr, timeout_ms, period_ms: DWORD, flags: TimerFlags) -> BOOL ---
 		DeleteTimerQueueTimer :: proc(timer_queue: TimerQueueHandle, timer: TimerHandle, completion_event: Handle = 0) -> BOOL ---
 		CancelIoEx :: proc(handle: Handle, overlapped: ^OVERLAPPED) -> BOOL ---
@@ -428,9 +429,9 @@ when ODIN_OS == .Windows {
 		EPOLLONESHOT = 30,
 		EPOLLET      = 31,
 	};CINT]
-	EpollEvent :: struct {
-		events: EpollEventFlags,
-		data:   struct #raw_union {
+	EpollEvent :: struct #packed {
+		flags:     EpollEventFlags,
+		user_data: struct #raw_union {
 			rawptr: rawptr,
 			handle: Handle,
 			u32:    u32,
@@ -449,12 +450,12 @@ when ODIN_OS == .Windows {
 
 	// flags
 	EpollFlags :: bit_set[enum {};CINT]
-	EpollOp :: enum {
+	EpollOp :: enum CINT {
 		EPOLL_CTL_ADD = 1,
 		EPOLL_CTL_DEL = 2,
 		EPOLL_CTL_MOD = 3,
 	}
-	ClockType :: enum {
+	ClockType :: enum CINT {
 		CLOCK_REALTIME  = 0,
 		CLOCK_MONOTONIC = 1,
 	}
@@ -465,11 +466,12 @@ when ODIN_OS == .Windows {
 		result := intrinsics.syscall(linux.SYS_epoll_create1, uintptr(transmute(CINT)flags))
 		return EpollHandle(result)
 	}
-	epoll_ctl :: #force_inline proc "system" (epoll: EpollHandle, op: CINT, fd: FileHandle, event: ^EpollEvent) -> int {
-		return int(intrinsics.syscall(linux.SYS_epoll_ctl, uintptr(epoll), uintptr(op), uintptr(fd), uintptr(event)))
+	epoll_ctl :: #force_inline proc "system" (epoll: EpollHandle, op: EpollOp, handle: Handle, event: ^EpollEvent) -> (errno: int) {
+		result := intrinsics.syscall(linux.SYS_epoll_ctl, uintptr(epoll), uintptr(op), uintptr(handle), uintptr(event))
+		return int(result)
 	}
-	epoll_wait :: #force_inline proc "system" (epoll: EpollHandle, events: [^]EpollEvent, events_count: CINT, timeout := max(CINT)) -> int {
-		return int(intrinsics.syscall(linux.SYS_epoll_wait, uintptr(epoll), uintptr(events), uintptr(events_count), uintptr(timeout)))
+	epoll_wait :: #force_inline proc "system" (epoll: EpollHandle, events: [^]EpollEvent, events_len: CINT, timeout := max(CINT)) -> (event_count: int) {
+		return int(intrinsics.syscall(linux.SYS_epoll_wait, uintptr(epoll), uintptr(events), uintptr(events_len), uintptr(timeout)))
 	}
 	timerfd_create :: #force_inline proc "system" (type: ClockType, flags: TimerFlags) -> TimerHandle {
 		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(transmute(CINT)flags)))
@@ -479,7 +481,9 @@ when ODIN_OS == .Windows {
 		flags: TimerFlags,
 		options: ^TimerOptions64,
 		prev_options: ^TimerOptions64 = nil,
-	) -> int {
+	) -> (
+		errno: int,
+	) {
 		when IS_64BIT {
 			syscall_id := linux.SYS_timerfd_settime
 		} else {
@@ -586,11 +590,11 @@ when ODIN_OS == .Windows {
 	};CINT]
 
 	// procs
-	mkdir :: #force_inline proc(dir_path: cstring, mode: FileMode = 0o755) -> int {
+	mkdir :: #force_inline proc(dir_path: cstring, mode: FileMode = 0o755) -> (errno: int) {
 		result := intrinsics.syscall(linux.SYS_mkdir, transmute(uintptr)dir_path, uintptr(mode))
 		return int(result)
 	}
-	renameat2 :: #force_inline proc(src_dir: DirHandle, src_path: cstring, dest_dir: DirHandle, dest_path: cstring, flags: CUINT = 0) -> int {
+	renameat2 :: #force_inline proc(src_dir: DirHandle, src_path: cstring, dest_dir: DirHandle, dest_path: cstring, flags: CUINT = 0) -> (errno: int) {
 		result := intrinsics.syscall(
 			linux.SYS_renameat2,
 			uintptr(src_dir),
@@ -601,7 +605,7 @@ when ODIN_OS == .Windows {
 		)
 		return int(result)
 	}
-	get_directory_entries_64b :: #force_inline proc "system" (file: DirHandle, buffer: [^]byte, buffer_size: int) -> int {
+	get_directory_entries_64b :: #force_inline proc "system" (file: DirHandle, buffer: [^]byte, buffer_size: int) -> (errno: int) {
 		result := intrinsics.syscall(linux.SYS_getdents64, uintptr(file), uintptr(buffer), uintptr(buffer_size))
 		return int(result)
 	}
@@ -610,19 +614,19 @@ when ODIN_OS == .Windows {
 		result := intrinsics.syscall(linux.SYS_open, transmute(uintptr)path, uintptr(transmute(CINT)flags), uintptr(mode))
 		return FileHandle(result)
 	}
-	read :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> int {
+	read :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> (bytes_read: int) {
 		result := intrinsics.syscall(linux.SYS_read, uintptr(file), uintptr(buffer), uintptr(buffer_size))
 		return int(result)
 	}
-	write :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> int {
+	write :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> (bytes_written: int) {
 		result := intrinsics.syscall(linux.SYS_write, uintptr(file), uintptr(buffer), uintptr(buffer_size))
 		return int(result)
 	}
-	fsync :: #force_inline proc "system" (file: FileHandle) -> int {
+	fsync :: #force_inline proc "system" (file: FileHandle) -> (errno: int) {
 		result := intrinsics.syscall(linux.SYS_fsync, uintptr(file))
 		return int(result)
 	}
-	fdatasync :: #force_inline proc "system" (file: FileHandle) -> int {
+	fdatasync :: #force_inline proc "system" (file: FileHandle) -> (errno: int) {
 		result := intrinsics.syscall(linux.SYS_fdatasync, uintptr(file))
 		return int(result)
 	}
@@ -678,14 +682,14 @@ when ODIN_OS == .Windows {
 	// procs
 	@(default_calling_convention = "c")
 	foreign kernel32 {
-		ReadDirectoryChangesW :: proc(dir: DirHandle, buffer: [^]byte, buffer_len: DWORD, subtree: BOOL, filter: FileNotifyFlags, bytes_returned: ^DWORD, overlapped: ^OVERLAPPED, on_complete: ^OVERLAPPED_COMPLETION_ROUTINE) -> BOOL ---
+		ReadDirectoryChangesW :: proc(dir: DirHandle, buffer: [^]byte, buffer_size: DWORD, subtree: BOOL, filter: FileNotifyFlags, bytes_returned: ^DWORD, overlapped: ^OVERLAPPED, on_complete: ^OVERLAPPED_COMPLETION_ROUTINE) -> BOOL ---
 	}
 } else when ODIN_OS == .Linux {
 	// types
 	FanotifyHandle :: distinct Handle
 
 	// flags
-	FanotifyClass :: enum {
+	FanotifyClass :: enum CINT {
 		FAN_CLASS_NOTIF = 0x0,
 	}
 	FanotifyInitFlags :: bit_set[enum {
@@ -713,7 +717,9 @@ when ODIN_OS == .Windows {
 		mask: FanotifyMarkMask,
 		dir: DirHandle,
 		path: cstring,
-	) -> int {
+	) -> (
+		errno: int,
+	) {
 		result := intrinsics.syscall(
 			linux.SYS_fanotify_mark,
 			uintptr(fanotify),
@@ -730,9 +736,7 @@ when ODIN_OS == .Windows {
 
 // socket
 SOMAXCONN :: max(CINT) /* NOTE: for some reason it's not max(CUINT)... */
-SOL_SOCKET :: CINT(max(u16)) /* NOTE: CINT used to be 16b... */
 SO_UPDATE_ACCEPT_CONTEXT: CINT : 0x700B
-INVALID_SOCKET :: max(SocketHandle)
 
 when ODIN_OS == .Windows {
 	// globals
@@ -807,15 +811,14 @@ when ODIN_OS == .Windows {
 	@(default_calling_convention = "c")
 	foreign winsock_lib {
 		WSAStartup :: proc(requested_version: WORD, winsock: ^WinsockData) -> CINT ---
-		WSAIoctl :: proc(socket: SocketHandle, control_code: DWORD, in_buf: rawptr, in_len: DWORD, out_buf: rawptr, out_len: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
+		WSAIoctl :: proc(socket: SocketHandle, control_code: DWORD, in_buffer: rawptr, in_size: DWORD, out_buffer: rawptr, out_size: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
 
-		/* TODO: only use WSASocketW() */
 		/* Returns a new `SocketHandle`, or `INVALID_HANDLE` */
-		WSASocketW :: proc(address_type: CINT, connection_type: SocketConnectionType, protocol: SocketProtocolType, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
+		WSASocketW :: proc(address_family: CINT, connection_type: SocketConnectionType, protocol: SocketProtocolType, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
 		bind :: proc(socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> CINT ---
 		listen :: proc(socket: SocketHandle, max_connections: CINT) -> CINT ---
 
-		setsockopt :: proc(socket: SocketHandle, level: CINT, optname: CINT, optval: rawptr, optlen: CINT) -> CINT ---
+		setsockopt :: proc(socket: SocketHandle, protocol: SocketProtocolType, key: CINT, value: rawptr, value_size: CINT) -> CINT ---
 		WSARecv :: proc(socket: SocketHandle, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
 		closesocket :: proc(socket: SocketHandle) -> CINT ---
 
@@ -845,28 +848,29 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Linux {
 	// procs
 	socket :: #force_inline proc "system" (
-		address_type: SocketAddressFamily,
+		address_family: SocketAddressFamily,
 		connection_type: SocketConnectionType,
 		protocol: SocketProtocolType,
 	) -> SocketHandle {
-		result := intrinsics.syscall(linux.SYS_socket, uintptr(address_type), uintptr(connection_type))
+		result := intrinsics.syscall(linux.SYS_socket, uintptr(address_family), uintptr(connection_type), uintptr(protocol))
 		return SocketHandle(result)
 	}
-	bind :: #force_inline proc "system" (socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> CINT {
-		assert_contextless(false)
-		return 0
+	bind :: #force_inline proc "system" (socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> (errno: int) {
+		result := intrinsics.syscall(linux.SYS_bind, uintptr(socket), uintptr(address), uintptr(address_size))
+		return int(result)
 	}
-	listen :: #force_inline proc "system" (socket: SocketHandle, max_connections: CINT) -> CINT {
-		assert_contextless(false)
-		return 0
+	listen :: #force_inline proc "system" (socket: SocketHandle, max_connections: CINT) -> (errno: int) {
+		result := intrinsics.syscall(linux.SYS_listen, uintptr(socket), uintptr(max_connections))
+		return int(result)
 	}
-	closesocket :: #force_inline proc "system" (socket: SocketHandle) -> CINT {
-		assert_contextless(false)
-		return 0
+
+	accept :: #force_inline proc "system" (socket: SocketHandle, address: ^SocketAddress, address_size: ^CINT) -> SocketHandle {
+		result := intrinsics.syscall(linux.SYS_accept, uintptr(socket), uintptr(address), uintptr(address_size))
+		return SocketHandle(result)
 	}
-	setsockopt :: #force_inline proc "system" (socket: SocketHandle, level: CINT, optname: CINT, optval: rawptr, optlen: CINT) -> CINT {
-		assert_contextless(false)
-		return 0
+	setsockopt :: #force_inline proc "system" (socket: SocketHandle, protocol: SocketProtocolType, key: CINT, value: rawptr, value_size: CINT) -> (errno: int) {
+		result := intrinsics.syscall(linux.SYS_setsockopt, uintptr(socket), uintptr(protocol), uintptr(key), uintptr(value), uintptr(value_size))
+		return int(result)
 	}
 } else {
 	//#assert(false)

@@ -13,7 +13,7 @@ _ASCII_MAX_CHAR :: 127
 index_ascii_char :: proc "c" (str: string, start: int, ascii_char: byte) -> (middle: int) {
 	/* TODO: do SIMD in a better way */
 	slice := str[start:]
-	index_or_err := #force_inline bytes.index_byte(transmute([]u8)str, ascii_char)
+	index_or_err := #force_inline bytes.index_byte(transmute([]u8)slice, ascii_char)
 	return index_or_err == -1 ? len(str) : start + index_or_err
 }
 index_ascii :: proc "c" (str: string, start: int, ascii_chars: string) -> (middle: int) {

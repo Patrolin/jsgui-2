@@ -12,7 +12,8 @@ when ODIN_OS == .Windows {
 	IoringEvent :: struct {
 		bytes:          u32,
 		error:          IoringError,
-		user_data:      ^OVERLAPPED `fmt:"p"`,
+		/* NOTE: `^OVERLAPPED` */
+		user_data:      rawptr `fmt:"p"`,
 		completion_key: uintptr,
 	}
 } else when ODIN_OS == .Linux {
@@ -27,6 +28,12 @@ when ODIN_OS == .Windows {
 	#assert(false)
 }
 
+/* NOTE: different platforms have different io handling:
+	name         | no syscalls | nonblocking | polling | wait on multiple objects | user_ptr
+	linux ioring | If enabled  | Yes?        | Yes     | Yes                      | Yes
+	windows IOCP | No          | No          | Yes     | Yes                      | Yes
+	linux epoll  | No          | Yes?        | Yes     | Yes                      | Yes
+*/
 ioring_create :: proc() -> (ioring: Ioring) {
 	when ODIN_OS == .Windows {
 		/* NOTE: allow up to `logical_cores` threads */
@@ -60,14 +67,14 @@ ioring_set_timer_async :: proc(
 			it_value = {tv_sec = 1},
 		}
 		timerfd_settime64(timer^, {}, &timer_options)
-		fmt.assertf(Handle(timer^) != INVALID_HANDLE, "Failed to create a timer")
+		fmt.assertf(timer^ != TimerHandle(INVALID_HANDLE), "Failed to create a timer")
 	} else {
 		assert(false)
 	}
 }
 ioring_cancel_timer :: proc "system" (ioring: Ioring, timer: ^IoringTimer) {
 	timer_handle := timer^
-	if Handle(timer_handle) == INVALID_HANDLE {
+	if timer_handle == TimerHandle(INVALID_HANDLE) {
 		return /* NOTE: windows crashes your program if you don't do this... */
 	}
 	when ODIN_OS == .Windows {
@@ -81,7 +88,7 @@ ioring_cancel_timer :: proc "system" (ioring: Ioring, timer: ^IoringTimer) {
 }
 ioring_wait_for_next_event :: proc(ioring: Ioring, event: ^IoringEvent) {
 	when ODIN_OS == .Windows {
-		ok := GetQueuedCompletionStatus(ioring, &event.bytes, &event.completion_key, &event.user_data, INFINITE)
+		ok := GetQueuedCompletionStatus(ioring, &event.bytes, &event.completion_key, (^^OVERLAPPED)(&event.user_data))
 		event.error = .None
 		if !ok {
 			err := GetLastError()
@@ -91,9 +98,14 @@ ioring_wait_for_next_event :: proc(ioring: Ioring, event: ^IoringEvent) {
 			case .ERROR_CONNECTION_ABORTED:
 				event.error = .ConnectionClosedByOtherParty
 			case:
-				fmt.assertf(false, "Failed to get next ioring event, err: %v", err)
+				fmt.assertf(false, "Failed to wait for the next ioring event, err: %v", err)
 			}
 		}
+	} else when ODIN_OS == .Linux {
+		epoll_event: EpollEvent
+		event_count := epoll_wait(ioring, &epoll_event, 1)
+		fmt.assertf(event_count == 1, "Failed to wait for the next ioring event, err: %v", Errno(event_count))
+		event.user_data = epoll_event.user_data.rawptr
 	} else {
 		assert(false)
 	}

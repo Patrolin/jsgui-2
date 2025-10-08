@@ -105,7 +105,7 @@ main :: proc() {
 			user_data = &watched_dir,
 		}
 		lib.init_sockets()
-		lib.create_server_socket(&server, global_serve_port)
+		lib.create_server_socket(ioring, &server, global_serve_port)
 		fmt.printfln("- Serving on http://localhost:%v/", global_serve_port)
 		when SERVE_THREAD_COUNT > 1 {
 			for i in 0 ..< SERVE_THREAD_COUNT - 1 {
@@ -141,6 +141,7 @@ serve_http_or_rebuild :: proc(server: ^lib.Server) {
 		free_all(context.temp_allocator)
 		event: lib.IoringEvent = ---
 		lib.ioring_wait_for_next_event(server.ioring, &event)
+		fmt.printfln("event: %v", event)
 
 		is_dir_event := rawptr(event.user_data) == watched_dir
 		if is_dir_event {

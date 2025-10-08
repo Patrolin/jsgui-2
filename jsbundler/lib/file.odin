@@ -13,7 +13,7 @@ create_dir_if_not_exists :: proc(dir_path: string) {
 		cdir_path, _ := copy_to_cstring(dir_path, cbuffer[:])
 		err := mkdir(cdir_path)
 		fmt.printfln("err: %v", err)
-		ok := err == ERR_NONE || err == ERR_EXIST
+		ok := err == 0 || Errno(err) == .EEXIST
 	} else {
 		assert(false)
 	}
@@ -28,7 +28,7 @@ move_path_atomically :: proc(src_path, dest_path: string) {
 		csrc_path, cbuffer2 := copy_to_cstring(src_path, cbuffer[:])
 		cdest_path, _ := copy_to_cstring(dest_path, cbuffer2)
 		err := renameat2(AT_FDCWD, csrc_path, AT_FDCWD, cdest_path)
-		assert(err == ERR_NONE)
+		fmt.assertf(err == 0, "Failed to move path: '%v' to '%v'", src_path, dest_path)
 	} else {
 		assert(false)
 	}
@@ -67,10 +67,10 @@ walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr),
 		cbuffer: [WINDOWS_MAX_PATH]byte = ---
 		cdir_path, _ := copy_to_cstring(dir_path, cbuffer[:])
 		dir := DirHandle(open(cdir_path, {.O_DIRECTORY}))
-		if int(dir) == ERR_NOTDIR {
+		if Errno(dir) == .ENOTDIR {
 			callback(dir_path, data)
 		} else {
-			assert(int(dir) >= ERR_NONE)
+			assert(dir >= 0)
 			dir_entries_buffer: [4096]byte
 			bytes_written := get_directory_entries_64b(dir, &dir_entries_buffer[0], len(dir_entries_buffer))
 			assert(bytes_written >= 0)
@@ -111,13 +111,14 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 			.Open,
 			{.FILE_ATTRIBUTE_NORMAL, .FILE_FLAG_SEQUENTIAL_SCAN},
 		)
-		ok = Handle(file) != INVALID_HANDLE
+		ok = file != FileHandle(INVALID_HANDLE)
 		if !ok {return}
 	} else when ODIN_OS == .Linux {
 		cbuffer: [WINDOWS_MAX_PATH]byte = ---
 		cfile_path, _ := copy_to_cstring(file_path, cbuffer[:])
 		file := open(cfile_path)
-		ok = Handle(file) != INVALID_HANDLE
+		ok = file >= 0
+		if !ok {file = FileHandle(INVALID_HANDLE)}
 	} else {
 		assert(false)
 	}

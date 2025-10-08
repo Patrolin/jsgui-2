@@ -42,7 +42,7 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 		cbuffer: [WINDOWS_MAX_PATH]byte
 		cdir_path, _ := copy_to_cstring(dir.path, cbuffer[:])
 		dir.handle = DirHandle(open(cdir_path))
-		fmt.assertf(dir.handle != DirHandle(INVALID_HANDLE), "Failed to open directory for watching: '%v'", dir.path)
+		fmt.assertf(dir.handle >= 0, "Failed to open directory for watching: '%v'", dir.path)
 	}
 	return
 }

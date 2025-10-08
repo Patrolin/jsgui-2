@@ -35,6 +35,7 @@ get_args :: proc(allocator := context.temp_allocator) -> (args: [dynamic]string)
 		}
 	} else when ODIN_OS == .Linux {
 		args_file, ok := read_file("/proc/self/cmdline", allocator = allocator)
+		fmt.assertf(ok, "Failed to read command line arguments")
 		i := 0
 		for c, j in args_file {
 			if c == 0 {

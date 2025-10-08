@@ -4,7 +4,7 @@ package lib
 when ODIN_OS == .Windows {
 	Handle :: distinct uintptr
 } else when ODIN_OS == .Linux {
-	Handle :: distinct CUINT
+	Handle :: distinct CINT
 } else {
 	//#assert(false)
 }
@@ -17,6 +17,7 @@ INVALID_HANDLE :: max(Handle)
 // socket
 when ODIN_OS == .Windows {
 	SocketAddressFamily :: enum u16 {
+		Unknown  = 0,
 		/* IPv4 */
 		AF_INET  = 2,
 		/* IPv6 */
@@ -24,6 +25,7 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	SocketAddressFamily :: enum u16 {
+		Unknown  = 0,
 		/* IPv4 */
 		AF_INET  = 2,
 		/* IPv6 */
@@ -45,6 +47,7 @@ SocketConnectionType :: enum CINT {
 SocketProtocolType :: enum CINT {
 	PROTOCOL_TCP = 6,
 	PROTOCOL_UDP = 17,
+	SOL_SOCKET   = CINT(max(u16)), /* NOTE: CINT used to be 16b... */
 }
 
 SocketAddress :: union {
@@ -53,7 +56,7 @@ SocketAddress :: union {
 SocketAddressIpv4 :: struct {
 	family:    SocketAddressFamily,
 	port:      u16be,
-	ip:        u32be,
+	ip:        u32be `fmt:"#X"`,
 	_reserved: [8]byte,
 }
 #assert(size_of(SocketAddressIpv4) == 16)
