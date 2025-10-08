@@ -300,7 +300,7 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 			result := CreateIoCompletionPort(Handle(client.socket), server.ioring, 0, 0)
 			fmt.assertf(result != 0, "Failed to listen to the client socket with IOCP")
 			err := setsockopt(client.socket, .SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, &server.socket, size_of(SocketHandle))
-			fmt.assertf(err == 0, "Failed to set client params, err: %v", Errno(err2))
+			fmt.assertf(err == 0, "Failed to set client params, err: %v", Errno(err))
 			/* TODO: get client address on windows */
 		} else when ODIN_OS == .Linux {
 			epoll_event := EpollEvent {
