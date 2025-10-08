@@ -95,7 +95,7 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	/* NOTE: linux ships on many architectures, and SYS_XXX probably depends on architecture */
-
+	/* NOTE: Errno has consistent values across architectures, but not across different platforms */
 	// flags
 	Errno :: enum int {
 		EPERM           = int(-1),
