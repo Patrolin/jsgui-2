@@ -811,7 +811,7 @@ when ODIN_OS == .Windows {
 
 		/* TODO: only use WSASocketW() */
 		/* Returns a new `SocketHandle`, or `INVALID_HANDLE` */
-		WSASocketW :: proc(address_type, connection_type, protocol: CINT, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
+		WSASocketW :: proc(address_type: CINT, connection_type: SocketConnectionType, protocol: SocketProtocolType, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
 		bind :: proc(socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> CINT ---
 		listen :: proc(socket: SocketHandle, max_connections: CINT) -> CINT ---
 
@@ -844,9 +844,13 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	// procs
-	socket :: #force_inline proc "system" (address_type, connection_type, protocol: CINT) -> SocketHandle {
-		assert_contextless(false)
-		return 0
+	socket :: #force_inline proc "system" (
+		address_type: SocketAddressFamily,
+		connection_type: SocketConnectionType,
+		protocol: SocketProtocolType,
+	) -> SocketHandle {
+		result := intrinsics.syscall(linux.SYS_socket, uintptr(address_type), uintptr(connection_type))
+		return SocketHandle(result)
 	}
 	bind :: #force_inline proc "system" (socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> CINT {
 		assert_contextless(false)

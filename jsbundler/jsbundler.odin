@@ -10,7 +10,7 @@ import "lib"
 
 // params
 SERVE_THREAD_COUNT :: 1
-PRINT_REBUILD :: true
+PRINT_REBUILD_ON_SAME_LINE :: false
 
 // globals
 global_serve_enabled := true
@@ -152,7 +152,7 @@ serve_http_or_rebuild :: proc(server: ^lib.Server) {
 	}
 }
 rebuild_index_file :: proc() {
-	when PRINT_REBUILD {fmt.print("\r- Rebuilding...")}
+	when PRINT_REBUILD_ON_SAME_LINE {fmt.print("\r- Rebuilding...")} else {fmt.println("- Rebuilding...")}
 	WalkData :: struct {
 		css_texts: [dynamic]string `fmt:"-"`,
 		js_texts:  [dynamic]string `fmt:"-"`,
@@ -207,5 +207,5 @@ rebuild_index_file :: proc() {
 	}
 	lib.write_to_file(index_file, "</script>")
 	lib.close_file(index_file)
-	when PRINT_REBUILD {fmt.printf("\r- Bundled into index.html")}
+	when PRINT_REBUILD_ON_SAME_LINE {fmt.print("\r- Bundled into index.html")} else {fmt.println("- Bundled into index.html")}
 }

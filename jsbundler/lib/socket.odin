@@ -2,26 +2,6 @@ package lib
 import "base:intrinsics"
 import "core:fmt"
 
-ADDRESS_TYPE_IPV4 :: 2
-ADDRESS_TYPE_IPV6 :: 23
-
-CONNECTION_TYPE_STREAM :: 1
-CONNECTION_TYPE_DGRAM :: 2
-
-PROTOCOL_TCP :: 6
-PROTOCOL_UDP :: 17
-
-SocketAddress :: union {
-	SocketAddressIpv4,
-}
-SocketAddressIpv4 :: struct {
-	family:    u16,
-	port:      u16be,
-	ip:        u32be,
-	_reserved: [8]byte,
-}
-#assert(size_of(SocketAddressIpv4) == 16)
-
 Server :: struct {
 	socket:    SocketHandle,
 	address:   SocketAddress,
@@ -92,20 +72,22 @@ init_sockets :: proc() {
 			WINSOCK_MAJOR_VERSION,
 			WINSOCK_MINOR_VERSION,
 		)
+	} else when ODIN_OS == .Linux {
+		/* noop */
 	} else {
 		assert(false)
 	}
 }
 create_server_socket :: proc(server: ^Server, port: u16) {
 	server.address = SocketAddressIpv4 {
-		family = ADDRESS_TYPE_IPV4,
+		family = .AF_INET,
 		ip     = u32be(0), // NOTE: 0.0.0.0
 		port   = u16be(port),
 	}
 	when ODIN_OS == .Windows {
-		server.socket = WSASocketW(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP, nil, .None, {.WSA_FLAG_OVERLAPPED})
+		server.socket = WSASocketW(CINT(SocketAddressFamily.AF_INET), .SOCK_STREAM, .PROTOCOL_TCP, nil, .None, {.WSA_FLAG_OVERLAPPED})
 	} else when ODIN_OS == .Linux {
-		server.socket = socket(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP)
+		server.socket = socket(.AF_INET, .SOCK_STREAM, .PROTOCOL_TCP)
 	} else {
 		assert(false)
 	}
@@ -141,7 +123,7 @@ accept_client_async :: proc(server: ^Server) {
 	client.async_write_file = FileHandle(INVALID_HANDLE)
 
 	when ODIN_OS == .Windows {
-		client.socket = WSASocketW(ADDRESS_TYPE_IPV4, CONNECTION_TYPE_STREAM, PROTOCOL_TCP, nil, .None, {.WSA_FLAG_OVERLAPPED})
+		client.socket = WSASocketW(CINT(SocketAddressFamily.AF_INET), .SOCK_STREAM, .PROTOCOL_TCP, nil, .None, {.WSA_FLAG_OVERLAPPED})
 		fmt.assertf(client.socket != INVALID_SOCKET, "Failed to create a client socket")
 		bytes_received: u32 = ---
 		//client.overlapped = {} // NOTE: AcceptEx() requires this to be zerod

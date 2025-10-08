@@ -127,7 +127,7 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 	for {
 		when ODIN_OS == .Windows {
 			bytes_read: u32 = ---
-			ReadFile(FileHandle(file), &buffer[0], len(buffer), &bytes_read, nil)
+			ReadFile(file, &buffer[0], len(buffer), &bytes_read, nil)
 		} else when ODIN_OS == .Linux {
 			bytes_read: int = ---
 			bytes_read = read(file, &buffer[0], len(buffer))

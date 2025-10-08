@@ -39,7 +39,10 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 		// associate with ioring
 		assert(CreateIoCompletionPort(Handle(dir.handle), ioring, 0, 0) != 0)
 	} else {
-		assert(false)
+		cbuffer: [WINDOWS_MAX_PATH]byte
+		cdir_path, _ := copy_to_cstring(dir.path, cbuffer[:])
+		dir.handle = DirHandle(open(cdir_path))
+		fmt.assertf(dir.handle != DirHandle(INVALID_HANDLE), "Failed to open directory for watching: '%v'", dir.path)
 	}
 	return
 }
@@ -69,7 +72,7 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 			// wait for file_size to change..
 			file := CreateFileW(&wfile_path[0], {.GENERIC_READ}, {.FILE_SHARE_READ, .FILE_SHARE_WRITE, .FILE_SHARE_DELETE}, nil, .Open, {.FILE_ATTRIBUTE_NORMAL})
 			fmt.assertf(file != FileHandle(INVALID_HANDLE), "file: %v, file_path: '%v'", file, file_path)
-			defer close_file(FileHandle(file))
+			defer close_file(file)
 
 			prev_file_size: LARGE_INTEGER = -1
 			file_size: LARGE_INTEGER = 0
@@ -77,7 +80,7 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 				prev_file_size = file_size
 				Sleep(0) /* NOTE: let other threads run first */
 				/* TODO: put open_file_for_reading() and get_file_size() in file.odin */
-				GetFileSizeEx(FileHandle(file), &file_size)
+				GetFileSizeEx(file, &file_size)
 			}
 
 			// get the next item
