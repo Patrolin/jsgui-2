@@ -23,8 +23,7 @@ get_args :: proc(allocator := context.temp_allocator) -> (args: [dynamic]string)
 			for wargs[j] != 0 && (wargs[j] != end_char) {
 				j += 1
 			}
-			warg := string16(wargs[i:j])
-			append(&args, tprint_wstring(warg, allocator = allocator))
+			append(&args, copy_cwstr_to_string(&wargs[i], j - i, allocator = allocator))
 
 			i = j
 			if end_char != 0 && wargs[j] == end_char {

@@ -26,7 +26,7 @@ ioring_open_dir_for_watching :: proc(ioring: Ioring, dir: ^WatchedDir) {
 		// open directory
 		dir.handle = DirHandle(
 			CreateFileW(
-			&tprint_string_as_wstring(dir.path)[0],
+			&copy_string_to_cwstr(dir.path)[0],
 			{.FILE_LIST_DIRECTORY},
 			{.FILE_SHARE_READ, .FILE_SHARE_WRITE, .FILE_SHARE_DELETE},
 			nil,
@@ -64,10 +64,9 @@ wait_for_writes_to_finish :: proc(dir: ^WatchedDir) {
 		for {
 			// chess battle advanced
 			item := (^FILE_NOTIFY_INFORMATION)(&dir.async_buffer[offset])
-			wrelative_file_path := ([^]u16)(&item.file_name)[:item.file_name_length >> 1]
-			relative_file_path := tprint_wstring(string16(wrelative_file_path))
+			relative_file_path := copy_cwstr_to_string(&item.file_name[0], int(item.file_name_length >> 1))
 			file_path := fmt.tprint(dir.path, relative_file_path, sep = "/")
-			wfile_path := tprint_string_as_wstring(file_path)
+			wfile_path := copy_string_to_cwstr(file_path)
 
 			// wait for file_size to change..
 			file := CreateFileW(&wfile_path[0], {.GENERIC_READ}, {.FILE_SHARE_READ, .FILE_SHARE_WRITE, .FILE_SHARE_DELETE}, nil, .Open, {.FILE_ATTRIBUTE_NORMAL})

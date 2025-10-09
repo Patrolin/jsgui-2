@@ -5,7 +5,7 @@ import "core:strings"
 
 create_dir_if_not_exists :: proc(dir_path: string) {
 	when ODIN_OS == .Windows {
-		CreateDirectoryW(&tprint_string_as_wstring(dir_path)[0], nil)
+		CreateDirectoryW(&copy_string_to_cwstr(dir_path)[0], nil)
 		err := GetLastError()
 		ok := err != .ERROR_PATH_NOT_FOUND
 	} else when ODIN_OS == .Linux {
@@ -21,7 +21,7 @@ create_dir_if_not_exists :: proc(dir_path: string) {
 }
 move_path_atomically :: proc(src_path, dest_path: string) {
 	when ODIN_OS == .Windows {
-		result := MoveFileExW(&tprint_string_as_wstring(src_path)[0], &tprint_string_as_wstring(dest_path)[0], {.MOVEFILE_REPLACE_EXISTING})
+		result := MoveFileExW(&copy_string_to_cwstr(src_path)[0], &copy_string_to_cwstr(dest_path)[0], {.MOVEFILE_REPLACE_EXISTING})
 		fmt.assertf(bool(result), "Failed to move path: '%v' to '%v'", src_path, dest_path)
 	} else when ODIN_OS == .Linux {
 		cbuffer: [2 * WINDOWS_MAX_PATH]byte = ---
@@ -41,13 +41,12 @@ move_path_atomically :: proc(src_path, dest_path: string) {
 walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr), data: rawptr = nil) {
 	when ODIN_OS == .Windows {
 		path_to_search := fmt.tprint(dir_path, "*", sep = "\\")
-		wpath_to_search := tprint_string_as_wstring(path_to_search)
+		wpath_to_search := copy_string_to_cwstr(path_to_search)
 		find_result: WIN32_FIND_DATAW
 		find := FindFirstFileW(&wpath_to_search[0], &find_result)
 		if find != FindFile(INVALID_HANDLE) {
 			for {
-				relative_wpath := &find_result.cFileName[0]
-				relative_path := tprint_wstring(relative_wpath)
+				relative_path := copy_cwstr_to_string(&find_result.cFileName[0])
 				assert(relative_path != "")
 
 				if relative_path != "." && relative_path != ".." {
@@ -104,7 +103,7 @@ walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr),
 @(require_results)
 open_file_for_reading :: proc(file_path: string) -> (file: FileHandle) {
 	when ODIN_OS == .Windows {
-		wfile_path := tprint_string_as_wstring(file_path)
+		wfile_path := copy_string_to_cwstr(file_path)
 		file = CreateFileW(
 			&wfile_path[0],
 			{.GENERIC_READ},
@@ -172,7 +171,7 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 // write
 open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHandle, ok: bool) {
 	when ODIN_OS == .Windows {
-		file = CreateFileW(&tprint_string_as_wstring(file_path)[0], {.GENERIC_WRITE}, {.FILE_SHARE_READ}, nil, .CreateOrOpenAndTruncate, {.FILE_ATTRIBUTE_NORMAL})
+		file = CreateFileW(&copy_string_to_cwstr(file_path)[0], {.GENERIC_WRITE}, {.FILE_SHARE_READ}, nil, .CreateOrOpenAndTruncate, {.FILE_ATTRIBUTE_NORMAL})
 		ok = file != FileHandle(INVALID_HANDLE)
 	} else when ODIN_OS == .Linux {
 		cbuffer: [WINDOWS_MAX_PATH]byte = ---

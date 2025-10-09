@@ -52,12 +52,10 @@ when ODIN_OS == .Windows {
 		CloseHandle :: proc(handle: Handle) -> BOOL ---
 	}
 
-	/* TODO: refactor these */
-	@(private = "file", require_results)
-	tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocator) -> string {
+	@(require_results)
+	copy_cwstr_to_string :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocator) -> string {
 		wlen_cint := CINT(wlen)
 		assert(int(wlen_cint) == wlen)
-
 		if intrinsics.expect(wlen_cint == 0, false) {return ""}
 
 		cstr_len := WideCharToMultiByte(.CP_UTF8, {.WC_ERR_INVALID_CHARS}, cwstr, wlen_cint, nil, 0, nil, nil)
@@ -65,22 +63,13 @@ when ODIN_OS == .Windows {
 		str_len := cstr_len - (wlen == -1 ? 1 : 0)
 		if intrinsics.expect(str_len == 0, false) {return ""}
 
-		str_buf, err := make([]byte, cstr_len, allocator = allocator)
-		assert(err == nil)
+		str_buf := make([]byte, cstr_len, allocator = allocator)
 		written_bytes := WideCharToMultiByte(.CP_UTF8, {.WC_ERR_INVALID_CHARS}, cwstr, wlen_cint, &str_buf[0], cstr_len, nil, nil)
 		assert(written_bytes == cstr_len)
 		return string(str_buf[:str_len])
 	}
-	@(private = "file", require_results)
-	tprint_string16 :: proc(wstr: string16, allocator := context.temp_allocator) -> string {
-		return tprint_cwstr(raw_data(wstr), len(wstr), allocator = allocator)
-	}
-	tprint_wstring :: proc {
-		tprint_cwstr,
-		tprint_string16,
-	}
 	@(require_results)
-	tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator, loc := #caller_location) -> []u16 {
+	copy_string_to_cwstr :: proc(str: string, allocator := context.temp_allocator, loc := #caller_location) -> []u16 {
 		str_len := len(str)
 		str_len_cint := CINT(str_len)
 		assert(int(str_len_cint) == str_len, loc = loc)
@@ -95,7 +84,7 @@ when ODIN_OS == .Windows {
 		return cwstr_buf[:cwlen]
 	}
 } else when ODIN_OS == .Linux {
-	/* NOTE: linux ships on many architectures, and SYS_XXX probably depends on architecture */
+	/* NOTE: linux ships on many architectures, and SYS_xxx probably depends on architecture */
 	/* NOTE: Errno has consistent values across architectures, but not across different platforms */
 	// flags
 	Errno :: enum int {
