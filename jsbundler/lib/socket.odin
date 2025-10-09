@@ -84,8 +84,11 @@ create_server_socket :: proc(ioring: Ioring, server: ^Server, port: u16) {
 		server.socket = WSASocketW(CINT(SocketAddressFamily.AF_INET), .SOCK_STREAM, .PROTOCOL_TCP, nil, .None, {.WSA_FLAG_OVERLAPPED})
 		fmt.assertf(server.socket != SocketHandle(INVALID_HANDLE), "Failed to create a server socket")
 	} else when ODIN_OS == .Linux {
-		server.socket = socket(.AF_INET, .SOCK_STREAM, .PROTOCOL_TCP)
+		server.socket = socket(.AF_INET, .SOCK_STREAM | .SOCK_NONBLOCK, .PROTOCOL_TCP)
 		fmt.assertf(server.socket >= 0, "Failed to create a server socket")
+		value := CINT(1)
+		reuse_err := setsockopt(server.socket, .SOL_SOCKET, .SO_REUSEADDR, &value, size_of(value))
+		fmt.assertf(reuse_err == 0, "Failed to set SO_REUSEADDR=1, err: %v", Errno(reuse_err))
 	} else {
 		assert(false)
 	}
@@ -95,8 +98,10 @@ create_server_socket :: proc(ioring: Ioring, server: ^Server, port: u16) {
 		ip     = u32be(0), // NOTE: 0.0.0.0
 		port   = u16be(port),
 	}
-	fmt.assertf(bind(server.socket, &server.address, size_of(SocketAddressIpv4)) == 0, "Failed to bind the server socket")
-	fmt.assertf(listen(server.socket, SOMAXCONN) == 0, "Failed to listen to the server socket")
+	bind_err := bind(server.socket, &server.address, size_of(SocketAddressIpv4))
+	fmt.assertf(bind_err == 0, "Failed to bind the server socket, err: %v", Errno(bind_err))
+	listen_err := listen(server.socket, SOMAXCONN)
+	fmt.assertf(listen_err == 0, "Failed to listen to the server socket, err: %v", Errno(listen_err))
 	// listen to socket events via ioring
 	when ODIN_OS == .Windows {
 		fmt.assertf(CreateIoCompletionPort(Handle(server.socket), server.ioring, 0, 0) == server.ioring, "Failed to listen to the server socket via IOCP")
@@ -121,8 +126,8 @@ create_server_socket :: proc(ioring: Ioring, server: ^Server, port: u16) {
 			flags = {.EPOLLIN},
 			user_data = {rawptr = server},
 		}
-		err := epoll_ctl(ioring, .EPOLL_CTL_ADD, Handle(server.socket), &event)
-		fmt.assertf(err == 0, "Failed to listen to the server socket via epoll")
+		epoll_err := epoll_ctl(ioring, .EPOLL_CTL_ADD, Handle(server.socket), &event)
+		fmt.assertf(epoll_err == 0, "Failed to listen to the server socket via epoll: %v", Errno(epoll_err))
 	} else {
 		assert(false)
 	}
@@ -188,6 +193,8 @@ receive_client_data_async :: proc(client: ^Client) {
 		has_error := WSARecv(client.socket, &client.async_rw_slice, 1, nil, &flags, &client.overlapped, nil)
 		err := WSAGetLastError()
 		fmt.assertf(has_error == 0 || err == .ERROR_IO_PENDING, "Failed to read data asynchronously, %v", err)
+	} else when ODIN_OS == .Linux {
+		/* noop */
 	} else {
 		assert(false)
 	}
@@ -195,22 +202,7 @@ receive_client_data_async :: proc(client: ^Client) {
 /*_send_client_data_async :: proc(client: ^AsyncClient) {
 	// TODO: send the response with WSASend(), but then we can't receive data (unless you allocate more overlappeds?)
 } */
-open_file_for_response :: proc(client: ^Client, file_path: string) -> (file_size: int, ok: bool) {
-	file := FileHandle(INVALID_HANDLE)
-	when ODIN_OS == .Windows {
-		wfile_path := &tprint_string_as_wstring(file_path, allocator = context.allocator)[0]
-		file = CreateFileW(wfile_path, {.GENERIC_READ}, {.FILE_SHARE_READ, .FILE_SHARE_WRITE}, nil, .Open, {.FILE_ATTRIBUTE_NORMAL, .FILE_FLAG_SEQUENTIAL_SCAN})
-		win_file_size: LARGE_INTEGER = ---
-		fmt.assertf(GetFileSizeEx(file, &win_file_size) == true, "Failed to get file size")
-		file_size = int(win_file_size)
-		ok = file != FileHandle(INVALID_HANDLE)
-	} else {
-		assert(false)
-	}
-	client.async_write_file = file
-	return
-}
-send_file_response_and_close_client :: proc(client: ^Client, header: []byte) {
+send_file_response_and_close_client :: proc(client: ^Client, header: []byte, file: FileHandle) {
 	// NOTE: don't overwrite if state == .ClosedXX
 	old, _ := intrinsics.atomic_compare_exchange_strong(&client.state, .Reading, .SendingFileResponseAndClosing)
 	if old == .ClosedByTimeout {return}
@@ -218,6 +210,9 @@ send_file_response_and_close_client :: proc(client: ^Client, header: []byte) {
 
 	fmt.assertf(len(header) < len(client.async_rw_buffer), "len(header) must be < len(client.async_rw_buffer), got: %v", len(header))
 	copy(header, client.async_rw_buffer[:])
+
+	old_file, file_ok := intrinsics.atomic_compare_exchange_strong(&client.async_write_file, FileHandle(INVALID_HANDLE), file)
+	fmt.assertf(file_ok, "Failed to set client.async_write_file, was: %v", old_file)
 
 	client.async_rw_prev_pos = 0
 	client.async_rw_pos = 0
@@ -243,22 +238,22 @@ send_file_response_and_close_client :: proc(client: ^Client, header: []byte) {
 cancel_timeout :: proc "system" (client: ^Client) {
 	ioring_cancel_timer(client.ioring, &client.timeout_timer)
 }
-cancel_io_and_close_client :: proc "system" (client: ^Client) {
+cancel_io_and_close_client :: proc "system" (client: ^Client, loc := #caller_location) {
 	when ODIN_OS == .Windows {
 		CancelIoEx(Handle(client.socket), nil)
 		close_client(client)
 	} else {
-		assert_contextless(false)
+		assert_contextless(false, loc = loc)
 	}
 }
-close_client :: proc "system" (client: ^Client) {
+close_client :: proc "system" (client: ^Client, loc := #caller_location) {
 	cancel_timeout(client)
 	when ODIN_OS == .Windows {
 		closesocket(client.socket)
 	} else when ODIN_OS == .Linux {
-		close_handle(Handle(client.socket))
+		close(FileHandle(client.socket))
 	} else {
-		assert_contextless(false)
+		assert_contextless(false, loc = loc)
 	}
 	switch client.state {
 	case .New, .Reading, .SendingFileResponseAndClosing:
@@ -295,16 +290,16 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 
 	switch client.state {
 	case .New:
-		// accept a new connection
+		// listen to client socket events
 		when ODIN_OS == .Windows {
 			result := CreateIoCompletionPort(Handle(client.socket), server.ioring, 0, 0)
 			fmt.assertf(result != 0, "Failed to listen to the client socket with IOCP")
-			err := setsockopt(client.socket, .SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, &server.socket, size_of(SocketHandle))
+			err := setsockopt(client.socket, .SOL_SOCKET, .SO_UPDATE_ACCEPT_CONTEXT, &server.socket, size_of(SocketHandle))
 			fmt.assertf(err == 0, "Failed to set client params, err: %v", Errno(err))
 			/* TODO: get client address on windows */
 		} else when ODIN_OS == .Linux {
 			epoll_event := EpollEvent {
-				flags = {.EPOLLIN},
+				flags = {.EPOLLIN, .EPOLLET},
 				user_data = {rawptr = client},
 			}
 			err := epoll_ctl(server.ioring, .EPOLL_CTL_ADD, Handle(client.socket), &epoll_event)
@@ -322,11 +317,26 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 				assert_contextless(false, "Shouldn't be necessary on other platforms")
 			}
 		}
-		ioring_set_timer_async(server.ioring, &client.timeout_timer, TIMEOUT_MS, client, on_timeout)
+	// nocheckin
+	//ioring_set_timer_async(server.ioring, &client.timeout_timer, TIMEOUT_MS, client, on_timeout)
 	/* TODO: parse address via GetAcceptExSockaddrs()? */
 	case .Reading:
+		when ODIN_OS == .Windows {
+			/* noop */
+		} else when ODIN_OS == .Linux {
+			buffer := &client.async_rw_buffer
+			bytes_read := read(FileHandle(client.socket), &buffer[0], len(buffer))
+			if bytes_read >= 0 {
+				event.bytes = u32(bytes_read - client.async_rw_pos)
+			} else {
+				fmt.assertf(Errno(bytes_read) == .EAGAIN || Errno(bytes_read) == .EWOULDBLOCK, "Failed to read from client asynchronously, err: %v", Errno(bytes_read))
+			}
+			fmt.printfln("-- bytes_read: %v, event.bytes: %v", bytes_read, event.bytes)
+		} else {
+			assert(false)
+		}
 		if event.bytes == 0 {
-			// NOTE: presumably this means we're out of memory in the async_read_buffer?
+			// NOTE: presumably this means we're out of memory in the async_rw_buffer?
 			client.state = .ClosedByClient
 			cancel_io_and_close_client(client)
 		} else {

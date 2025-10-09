@@ -99,11 +99,13 @@ walk_files :: proc(dir_path: string, callback: proc(path: string, data: rawptr),
 		assert(false)
 	}
 }
-read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (text: string, ok: bool) #no_bounds_check {
-	// open file
+
+// read
+@(require_results)
+open_file_for_reading :: proc(file_path: string) -> (file: FileHandle) {
 	when ODIN_OS == .Windows {
 		wfile_path := tprint_string_as_wstring(file_path)
-		file := CreateFileW(
+		file = CreateFileW(
 			&wfile_path[0],
 			{.GENERIC_READ},
 			{.FILE_SHARE_READ, .FILE_SHARE_WRITE},
@@ -111,41 +113,63 @@ read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (te
 			.Open,
 			{.FILE_ATTRIBUTE_NORMAL, .FILE_FLAG_SEQUENTIAL_SCAN},
 		)
-		ok = file != FileHandle(INVALID_HANDLE)
-		if !ok {return}
 	} else when ODIN_OS == .Linux {
 		cbuffer: [WINDOWS_MAX_PATH]byte = ---
 		cfile_path, _ := copy_to_cstring(file_path, cbuffer[:])
-		file := open(cfile_path)
-		ok = file >= 0
-		if !ok {file = FileHandle(INVALID_HANDLE)}
+		file = open(cfile_path)
+		if file < 0 {file = FileHandle(INVALID_HANDLE)}
 	} else {
 		assert(false)
 	}
-	// read file
-	sb := string_builder(allocator = allocator)
-	buffer: [4096]u8 = ---
-	for {
-		when ODIN_OS == .Windows {
-			bytes_read: u32 = ---
-			ReadFile(file, &buffer[0], len(buffer), &bytes_read, nil)
-		} else when ODIN_OS == .Linux {
-			bytes_read: int = ---
-			bytes_read = read(file, &buffer[0], len(buffer))
-		}
-		if bytes_read == 0 {break}
-		fmt.sbprint(&sb, string(buffer[:bytes_read]))
-	}
-	when ODIN_OS == .Windows {
-		CloseHandle(Handle(file))
-	} else when ODIN_OS == .Linux {
-		close_handle(Handle(file))
-	} else {
-		assert(false)
-	}
-	text = to_string(sb)
 	return
 }
+/* NOTE: this can fail if the file gets deleted or whatever */
+@(require_results)
+get_file_size :: proc(file: FileHandle) -> (file_size: int, ok: bool) {
+	when ODIN_OS == .Windows {
+		win_file_size: LARGE_INTEGER = ---
+		ok = GetFileSizeEx(file, &win_file_size) == true
+		file_size = int(win_file_size)
+	} else when ODIN_OS == .Linux {
+		file_info: Statx = ---
+		err := get_file_info(file, {.STATX_SIZE}, &file_info)
+		ok = err == 0
+		file_size = int(file_info.size)
+	} else {
+		assert(false)
+	}
+	return
+}
+@(require_results)
+read_file :: proc(file_path: string, allocator := context.temp_allocator) -> (text: string, ok: bool) #no_bounds_check {
+	// open file
+	file := open_file_for_reading(file_path)
+	ok = file != FileHandle(INVALID_HANDLE)
+	if ok {
+		// read file
+		sb := string_builder(allocator = allocator)
+		buffer: [4096]u8 = ---
+		for {
+			when ODIN_OS == .Windows {
+				bytes_read: u32 = ---
+				ReadFile(file, &buffer[0], len(buffer), &bytes_read, nil)
+			} else when ODIN_OS == .Linux {
+				bytes_read: int = ---
+				bytes_read = read(file, &buffer[0], len(buffer))
+			} else {
+				assert(false)
+			}
+			if bytes_read == 0 {break}
+			fmt.sbprint(&sb, string(buffer[:bytes_read]))
+		}
+		text = to_string(sb)
+		// close file
+		close_file(file)
+	}
+	return
+}
+
+// write
 open_file_for_writing_and_truncate :: proc(file_path: string) -> (file: FileHandle, ok: bool) {
 	when ODIN_OS == .Windows {
 		file = CreateFileW(&tprint_string_as_wstring(file_path)[0], {.GENERIC_WRITE}, {.FILE_SHARE_READ}, nil, .CreateOrOpenAndTruncate, {.FILE_ATTRIBUTE_NORMAL})
@@ -173,7 +197,7 @@ write_to_file :: proc(file: FileHandle, text: string) {
 		assert(false)
 	}
 }
-flush_file :: proc(file: FileHandle) {
+flush_file_data_and_metadata :: proc(file: FileHandle) {
 	when ODIN_OS == .Windows {
 		assert(bool(FlushFileBuffers(file)))
 	} else when ODIN_OS == .Linux {
@@ -182,11 +206,20 @@ flush_file :: proc(file: FileHandle) {
 		assert(false)
 	}
 }
+flush_file_data :: proc(file: FileHandle) {
+	when ODIN_OS == .Windows {
+		assert(bool(FlushFileBuffers(file)))
+	} else when ODIN_OS == .Linux {
+		assert(fdatasync(file) == 0)
+	} else {
+		assert(false)
+	}
+}
 close_file :: proc(file: FileHandle) {
 	when ODIN_OS == .Windows {
 		CloseHandle(Handle(file))
 	} else when ODIN_OS == .Linux {
-		close_handle(Handle(file))
+		close(file)
 	} else {
 		assert(false)
 	}
@@ -197,7 +230,7 @@ write_file_atomically :: proc(file_path, text: string) {
 	// write to temp file
 	temp_file_path := fmt.tprintf("%v.tmp", file_path)
 	temp_file, ok := open_file_for_writing_and_truncate(temp_file_path)
-	assert(ok)
+	fmt.assertf(ok, "Failed to open file: '%v'", file_path)
 	write_to_file(temp_file, text)
 	close_file(temp_file)
 	// move temp file to file_path

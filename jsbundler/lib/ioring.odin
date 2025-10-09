@@ -66,7 +66,7 @@ ioring_set_timer_async :: proc(
 		timer_options := TimerOptions64 {
 			it_value = {tv_sec = 1},
 		}
-		timerfd_settime64(timer^, {}, &timer_options)
+		timerfd_settime_64b(timer^, {}, &timer_options)
 		fmt.assertf(timer^ != TimerHandle(INVALID_HANDLE), "Failed to create a timer")
 	} else {
 		assert(false)
@@ -80,7 +80,7 @@ ioring_cancel_timer :: proc "system" (ioring: Ioring, timer: ^IoringTimer) {
 	when ODIN_OS == .Windows {
 		DeleteTimerQueueTimer(0, timer_handle)
 	} else when ODIN_OS == .Linux {
-		close_handle(Handle(timer_handle))
+		close(FileHandle(timer_handle))
 	} else {
 		assert(false)
 	}
@@ -106,6 +106,7 @@ ioring_wait_for_next_event :: proc(ioring: Ioring, event: ^IoringEvent) {
 		event_count := epoll_wait(ioring, &epoll_event, 1)
 		fmt.assertf(event_count == 1, "Failed to wait for the next ioring event, err: %v", Errno(event_count))
 		event.user_data = epoll_event.user_data.rawptr
+		event.bytes = 0
 	} else {
 		assert(false)
 	}

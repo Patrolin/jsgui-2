@@ -1,6 +1,7 @@
 package lib
 import "core:fmt"
 
+@(require_results)
 get_args :: proc(allocator := context.temp_allocator) -> (args: [dynamic]string) {
 	args.allocator = allocator
 	when ODIN_OS == .Windows {

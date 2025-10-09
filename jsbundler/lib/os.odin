@@ -53,7 +53,7 @@ when ODIN_OS == .Windows {
 	}
 
 	/* TODO: refactor these */
-	@(private = "file")
+	@(private = "file", require_results)
 	tprint_cwstr :: proc(cwstr: CWSTR, wlen := -1, allocator := context.temp_allocator) -> string {
 		wlen_cint := CINT(wlen)
 		assert(int(wlen_cint) == wlen)
@@ -71,7 +71,7 @@ when ODIN_OS == .Windows {
 		assert(written_bytes == cstr_len)
 		return string(str_buf[:str_len])
 	}
-	@(private = "file")
+	@(private = "file", require_results)
 	tprint_string16 :: proc(wstr: string16, allocator := context.temp_allocator) -> string {
 		return tprint_cwstr(raw_data(wstr), len(wstr), allocator = allocator)
 	}
@@ -79,6 +79,7 @@ when ODIN_OS == .Windows {
 		tprint_cwstr,
 		tprint_string16,
 	}
+	@(require_results)
 	tprint_string_as_wstring :: proc(str: string, allocator := context.temp_allocator, loc := #caller_location) -> []u16 {
 		str_len := len(str)
 		str_len_cint := CINT(str_len)
@@ -236,8 +237,8 @@ when ODIN_OS == .Windows {
 	}
 
 	// procs
-	close_handle :: #force_inline proc "system" (handle: Handle) -> (errno: int) {
-		return int(intrinsics.syscall(linux.SYS_close, uintptr(handle)))
+	close :: #force_inline proc "system" (file: FileHandle) -> (errno: int) {
+		return int(intrinsics.syscall(linux.SYS_close, uintptr(file)))
 	}
 	@(require_results)
 	copy_to_cstring :: #force_inline proc(str: string, cbuffer: []byte) -> (cstr: cstring, next_cbuffer: []byte) #no_bounds_check {
@@ -352,11 +353,11 @@ when ODIN_OS == .Windows {
 		PROT_EXEC  = 0,
 		PROT_READ  = 1,
 		PROT_WRITE = 2,
-	};CINT]
+	};CUINT]
 	AllocTypeFlags :: bit_set[enum {
 		MAP_PRIVATE   = 1,
 		MAP_ANONYMOUS = 5,
-	};CINT]
+	};CUINT]
 
 	// procs
 	mmap :: #force_inline proc "system" (
@@ -371,8 +372,8 @@ when ODIN_OS == .Windows {
 			linux.SYS_mmap,
 			uintptr(address),
 			uintptr(size),
-			uintptr(transmute(CINT)protect_flags),
-			uintptr(transmute(CINT)type_flags),
+			uintptr(transmute(CUINT)protect_flags),
+			uintptr(transmute(CUINT)type_flags),
 			uintptr(file),
 			uintptr(offset),
 		)
@@ -423,22 +424,22 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Linux {
 	// types
-	EpollHandle :: distinct Handle
+	EpollHandle :: distinct FileHandle
 	EpollEventFlags :: bit_set[enum {
 		EPOLLIN      = 0,
 		EPOLLONESHOT = 30,
 		EPOLLET      = 31,
-	};CINT]
+	};CUINT]
 	EpollEvent :: struct #packed {
 		flags:     EpollEventFlags,
 		user_data: struct #raw_union {
 			rawptr: rawptr,
-			handle: Handle,
+			file:   FileHandle,
 			u32:    u32,
 			u64:    u64,
 		},
 	}
-	TimerHandle :: distinct Handle
+	TimerHandle :: distinct FileHandle
 	TimeSpec64 :: struct {
 		tv_sec:  i64,
 		tv_nsec: i64,
@@ -449,34 +450,34 @@ when ODIN_OS == .Windows {
 	}
 
 	// flags
-	EpollFlags :: bit_set[enum {};CINT]
-	EpollOp :: enum CINT {
+	EpollFlags :: bit_set[enum {};CUINT]
+	EpollOp :: enum CUINT {
 		EPOLL_CTL_ADD = 1,
 		EPOLL_CTL_DEL = 2,
 		EPOLL_CTL_MOD = 3,
 	}
-	ClockType :: enum CINT {
+	ClockType :: enum CUINT {
 		CLOCK_REALTIME  = 0,
 		CLOCK_MONOTONIC = 1,
 	}
-	TimerFlags :: bit_set[enum {};CINT]
+	TimerFlags :: bit_set[enum {};CUINT]
 
 	// procs
 	epoll_create1 :: #force_inline proc "system" (flags: EpollFlags) -> EpollHandle {
-		result := intrinsics.syscall(linux.SYS_epoll_create1, uintptr(transmute(CINT)flags))
+		result := intrinsics.syscall(linux.SYS_epoll_create1, uintptr(transmute(CUINT)flags))
 		return EpollHandle(result)
 	}
-	epoll_ctl :: #force_inline proc "system" (epoll: EpollHandle, op: EpollOp, handle: Handle, event: ^EpollEvent) -> (errno: int) {
-		result := intrinsics.syscall(linux.SYS_epoll_ctl, uintptr(epoll), uintptr(op), uintptr(handle), uintptr(event))
+	epoll_ctl :: #force_inline proc "system" (epoll: EpollHandle, op: EpollOp, file: FileHandle, event: ^EpollEvent) -> (errno: int) {
+		result := intrinsics.syscall(linux.SYS_epoll_ctl, uintptr(epoll), uintptr(op), uintptr(file), uintptr(event))
 		return int(result)
 	}
 	epoll_wait :: #force_inline proc "system" (epoll: EpollHandle, events: [^]EpollEvent, events_len: CINT, timeout := max(CINT)) -> (event_count: int) {
 		return int(intrinsics.syscall(linux.SYS_epoll_wait, uintptr(epoll), uintptr(events), uintptr(events_len), uintptr(timeout)))
 	}
 	timerfd_create :: #force_inline proc "system" (type: ClockType, flags: TimerFlags) -> TimerHandle {
-		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(transmute(CINT)flags)))
+		return TimerHandle(intrinsics.syscall(linux.SYS_timerfd_create, uintptr(type), uintptr(transmute(CUINT)flags)))
 	}
-	timerfd_settime64 :: #force_inline proc "system" (
+	timerfd_settime_64b :: #force_inline proc "system" (
 		timer: TimerHandle,
 		flags: TimerFlags,
 		options: ^TimerOptions64,
@@ -489,7 +490,7 @@ when ODIN_OS == .Windows {
 		} else {
 			syscall_id := linux.SYS_timerfd_settime64
 		}
-		return int(intrinsics.syscall(syscall_id, uintptr(timer), uintptr(transmute(CINT)flags), uintptr(options), uintptr(prev_options)))
+		return int(intrinsics.syscall(syscall_id, uintptr(timer), uintptr(transmute(CUINT)flags), uintptr(options), uintptr(prev_options)))
 	}
 } else {
 	//#assert(false)
@@ -574,6 +575,40 @@ when ODIN_OS == .Windows {
 		type:       Dirent64Type,
 		cfile_name: [1]byte,
 	}
+	StatxTimestamp :: struct {
+		tv_sec:  i64,
+		tv_nsec: u32,
+	}
+	Statx :: struct {
+		mask:                          u32,
+		blksize:                       u32,
+		attributes:                    u64,
+		nlink:                         u32,
+		uid:                           u32,
+		gid:                           u32,
+		mode:                          u16,
+		ino:                           u64,
+		size:                          u64,
+		blocks:                        u64,
+		attributes_mask:               u64,
+		access_time:                   StatxTimestamp,
+		creation_time:                 StatxTimestamp,
+		status_change_time:            StatxTimestamp,
+		modification_time:             StatxTimestamp,
+		stx_rdev_major:                u32,
+		stx_rdev_minor:                u32,
+		stx_dev_major:                 u32,
+		stx_dev_minor:                 u32,
+		stx_mnt_id:                    u64,
+		stx_dio_mem_align:             u32,
+		stx_dio_offset_align:          u32,
+		stx_subvol:                    u64,
+		stx_atomic_write_unit_min:     u32,
+		stx_atomic_write_unit_max:     u32,
+		stx_atomic_write_segments_max: u32,
+		stx_dio_read_offset_align:     u32,
+		stx_atomic_write_unit_max_opt: u32,
+	}
 
 	// flags
 	AT_FDCWD :: transmute(DirHandle)(i32(-100))
@@ -587,7 +622,15 @@ when ODIN_OS == .Windows {
 		/* truncate */
 		O_TRUNC     = 9,
 		O_DIRECTORY = 16,
-	};CINT]
+	};CUINT]
+	StatxFlags :: bit_set[enum {
+		AT_EMPTY_PATH = 12,
+	};CUINT]
+	#assert(int(StatxFlags{.AT_EMPTY_PATH}) == 0x1000)
+	StatxMask :: bit_set[enum {
+		STATX_SIZE = 9,
+	};CUINT]
+	#assert(int(StatxMask{.STATX_SIZE}) == 0x00000200)
 
 	// procs
 	mkdir :: #force_inline proc(dir_path: cstring, mode: FileMode = 0o755) -> (errno: int) {
@@ -605,13 +648,31 @@ when ODIN_OS == .Windows {
 		)
 		return int(result)
 	}
+	/* NOTE: writes variable encoded `Dirent64`s into the buffer */
 	get_directory_entries_64b :: #force_inline proc "system" (file: DirHandle, buffer: [^]byte, buffer_size: int) -> (errno: int) {
 		result := intrinsics.syscall(linux.SYS_getdents64, uintptr(file), uintptr(buffer), uintptr(buffer_size))
 		return int(result)
 	}
 	/* Return the new `FileHandle`, `DirHandle`, or `INVALID_HANDLE` */
 	open :: #force_inline proc "system" (path: cstring, flags: FileFlags = {}, mode: FileMode = 0o755) -> FileHandle {
-		result := intrinsics.syscall(linux.SYS_open, transmute(uintptr)path, uintptr(transmute(CINT)flags), uintptr(mode))
+		result := intrinsics.syscall(linux.SYS_open, transmute(uintptr)path, uintptr(transmute(CUINT)flags), uintptr(mode))
+		return FileHandle(result)
+	}
+	get_file_info :: #force_inline proc "system" (
+		dir_or_file: FileHandle,
+		mask: StatxMask,
+		buffer: ^Statx,
+		flags := StatxFlags{.AT_EMPTY_PATH},
+		path: cstring = "",
+	) -> FileHandle {
+		result := intrinsics.syscall(
+			linux.SYS_statx,
+			uintptr(dir_or_file),
+			transmute(uintptr)path,
+			uintptr(transmute(CUINT)flags),
+			uintptr(transmute(CUINT)mask),
+			uintptr(buffer),
+		)
 		return FileHandle(result)
 	}
 	read :: #force_inline proc "system" (file: FileHandle, buffer: [^]byte, buffer_size: int) -> (bytes_read: int) {
@@ -689,7 +750,7 @@ when ODIN_OS == .Windows {
 	FanotifyHandle :: distinct Handle
 
 	// flags
-	FanotifyClass :: enum CINT {
+	FanotifyClass :: enum CUINT {
 		FAN_CLASS_NOTIF = 0x0,
 	}
 	FanotifyInitFlags :: bit_set[enum {
@@ -736,7 +797,6 @@ when ODIN_OS == .Windows {
 
 // socket
 SOMAXCONN :: max(CINT) /* NOTE: for some reason it's not max(CUINT)... */
-SO_UPDATE_ACCEPT_CONTEXT: CINT : 0x700B
 
 when ODIN_OS == .Windows {
 	// globals
@@ -814,11 +874,11 @@ when ODIN_OS == .Windows {
 		WSAIoctl :: proc(socket: SocketHandle, control_code: DWORD, in_buffer: rawptr, in_size: DWORD, out_buffer: rawptr, out_size: DWORD, bytes_written: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
 
 		/* Returns a new `SocketHandle`, or `INVALID_HANDLE` */
-		WSASocketW :: proc(address_family: CINT, connection_type: SocketConnectionType, protocol: SocketProtocolType, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
+		WSASocketW :: proc(address_family: CINT, connection_flags: SocketConnectionFlags, protocol: SocketProtocolType, protocol_info: ^WSAPROTOCOL_INFOW, group: WinsockGroup, flags: WSASocketFlags) -> SocketHandle ---
 		bind :: proc(socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> CINT ---
 		listen :: proc(socket: SocketHandle, max_connections: CINT) -> CINT ---
 
-		setsockopt :: proc(socket: SocketHandle, protocol: SocketProtocolType, key: CINT, value: rawptr, value_size: CINT) -> CINT ---
+		setsockopt :: proc(socket: SocketHandle, protocol: SocketProtocolType, key: SocketOptionKey, value: rawptr, value_size: CINT) -> CINT ---
 		WSARecv :: proc(socket: SocketHandle, buffers: ^WSABUF, buffer_count: DWORD, bytes_received: ^DWORD, flags: ^DWORD, overlapped: ^OVERLAPPED, on_complete: WSAOVERLAPPED_COMPLETION_ROUTINE) -> CINT ---
 		closesocket :: proc(socket: SocketHandle) -> CINT ---
 
@@ -849,10 +909,10 @@ when ODIN_OS == .Windows {
 	// procs
 	socket :: #force_inline proc "system" (
 		address_family: SocketAddressFamily,
-		connection_type: SocketConnectionType,
+		connection_flags: SocketConnectionFlags,
 		protocol: SocketProtocolType,
 	) -> SocketHandle {
-		result := intrinsics.syscall(linux.SYS_socket, uintptr(address_family), uintptr(connection_type), uintptr(protocol))
+		result := intrinsics.syscall(linux.SYS_socket, uintptr(address_family), uintptr(connection_flags), uintptr(protocol))
 		return SocketHandle(result)
 	}
 	bind :: #force_inline proc "system" (socket: SocketHandle, address: ^SocketAddress, address_size: CINT) -> (errno: int) {
@@ -868,7 +928,15 @@ when ODIN_OS == .Windows {
 		result := intrinsics.syscall(linux.SYS_accept, uintptr(socket), uintptr(address), uintptr(address_size))
 		return SocketHandle(result)
 	}
-	setsockopt :: #force_inline proc "system" (socket: SocketHandle, protocol: SocketProtocolType, key: CINT, value: rawptr, value_size: CINT) -> (errno: int) {
+	setsockopt :: #force_inline proc "system" (
+		socket: SocketHandle,
+		protocol: SocketProtocolType,
+		key: SocketOptionKey,
+		value: rawptr,
+		value_size: CINT,
+	) -> (
+		errno: int,
+	) {
 		result := intrinsics.syscall(linux.SYS_setsockopt, uintptr(socket), uintptr(protocol), uintptr(key), uintptr(value), uintptr(value_size))
 		return int(result)
 	}

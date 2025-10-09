@@ -32,6 +32,7 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 	case .Reading:
 		request := transmute(string)client.async_rw_buffer[:client.async_rw_pos]
 		// send response if valid request
+		fmt.printfln("request: %v, '%v'", client.async_rw_pos, request[:min(15, client.async_rw_pos)])
 		if len(request) >= len(GET_START) {
 			if !lib.starts_with(request, GET_START) {
 				lib.cancel_io_and_close_client(client)
@@ -39,12 +40,15 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 				// handle request
 				// TODO: handle favicons or whatever?
 				file_path := "index.html"
-				file_size, ok := lib.open_file_for_response(client, file_path)
-				fmt.assertf(ok, "Failed to open file: '%v'", file_path)
+				file := lib.open_file_for_reading(file_path)
+				file_ok := file != lib.FileHandle(lib.INVALID_HANDLE)
+				fmt.assertf(file_ok, "Failed to open file: '%v'", file_path)
+				file_size, file_size_ok := lib.get_file_size(file)
+				fmt.assertf(file_size_ok, "Failed to get file size: '%v'", file_path)
 				// write http headers
 				content_type := "text/html"
 				header := fmt.tprintf("HTTP/1.1 200 OK\r\nContent-Length: %v\r\nContent-Type: %v\r\nConnection: close\r\n\r\n", file_size, content_type)
-				lib.send_file_response_and_close_client(client, transmute([]byte)header)
+				lib.send_file_response_and_close_client(client, transmute([]byte)header, file)
 				return
 			}
 		}

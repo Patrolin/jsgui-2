@@ -56,6 +56,7 @@ last_index_ascii_char :: proc "c" (str: string, ascii_char: byte) -> (start: int
 /* NOTE: don't allow uninitialized StringBuilder... */
 @(private)
 StringBuilder :: strings.Builder
+@(require_results)
 string_builder :: #force_inline proc(allocator := context.temp_allocator) -> StringBuilder {
 	return strings.builder_make_none(allocator)
 }
