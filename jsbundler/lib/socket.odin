@@ -135,14 +135,15 @@ create_server_socket :: proc(ioring: Ioring, server: ^Server, port: u16) {
 	return
 }
 @(private)
-make_client :: proc(server: ^Server) -> (client: ^Client) {
+_make_client :: proc(server: ^Server) -> (client: ^Client) {
 	client = new(Client) // TODO: how does one allocate a nonzerod struct in Odin?
 	client.ioring = server.ioring
 	client.async_write_file = FileHandle(INVALID_HANDLE)
 	return
 }
-_accept_client_sync :: proc(server: ^Server) -> (client: ^Client) {
-	client = make_client(server)
+@(private)
+_accept_client_poll :: proc(server: ^Server) -> (client: ^Client) {
+	client = _make_client(server)
 	when ODIN_OS == .Windows {
 		unreachable()
 	} else when ODIN_OS == .Linux {
@@ -158,7 +159,7 @@ _accept_client_sync :: proc(server: ^Server) -> (client: ^Client) {
 accept_client_async :: proc(server: ^Server) {
 	/* NOTE: on windows we have to allocate ahead of time, on linux we don't */
 	when ODIN_OS == .Windows {
-		client := make_client(server)
+		client := _make_client(server)
 		client.socket = WSASocketW(CINT(SocketAddressFamily.AF_INET), .SOCK_STREAM, .PROTOCOL_TCP, nil, .None, {.WSA_FLAG_OVERLAPPED})
 		fmt.assertf(client.socket != SocketHandle(INVALID_HANDLE), "Failed to reserve a client socket")
 		bytes_received: u32 = ---
@@ -182,13 +183,13 @@ accept_client_async :: proc(server: ^Server) {
 	}
 }
 receive_client_data_async :: proc(client: ^Client) {
+	intrinsics.atomic_compare_exchange_strong(&client.state, .New, .Reading)
 	when ODIN_OS == .Windows {
+		client.overlapped = {}
 		client.async_rw_slice = {
 			buffer = &client.async_rw_buffer[client.async_rw_pos],
 			len    = u32(len(client.async_rw_buffer) - client.async_rw_pos),
 		}
-
-		client.overlapped = {}
 		flags: u32 = 0 /* TODO: bit_set for this */
 		has_error := WSARecv(client.socket, &client.async_rw_slice, 1, nil, &flags, &client.overlapped, nil)
 		err := WSAGetLastError()
@@ -238,14 +239,6 @@ send_file_response_and_close_client :: proc(client: ^Client, header: []byte, fil
 cancel_timeout :: proc "system" (client: ^Client) {
 	ioring_cancel_timer(client.ioring, &client.timeout_timer)
 }
-cancel_io_and_close_client :: proc "system" (client: ^Client, loc := #caller_location) {
-	when ODIN_OS == .Windows {
-		CancelIoEx(Handle(client.socket), nil)
-		close_client(client)
-	} else {
-		assert_contextless(false, loc = loc)
-	}
-}
 close_client :: proc "system" (client: ^Client, loc := #caller_location) {
 	cancel_timeout(client)
 	when ODIN_OS == .Windows {
@@ -255,16 +248,12 @@ close_client :: proc "system" (client: ^Client, loc := #caller_location) {
 	} else {
 		assert_contextless(false, loc = loc)
 	}
-	switch client.state {
-	case .New, .Reading, .SendingFileResponseAndClosing:
-		client.state = .ClosedByServer
-	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse, .ClosedByServer:
-	}
+	client.state = .ClosedByServer
 }
 handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^Client) {
 	if event.user_data == server {
 		/* NOTE: on windows we had to allocate ahead of time, on linux we don't */
-		client = _accept_client_sync(server)
+		client = _accept_client_poll(server)
 	} else {
 		client = (^Client)(event.user_data)
 	}
@@ -274,7 +263,6 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 		client.state = .ClosedByTimeout
 	case .ConnectionClosedByOtherParty:
 		client.state = .ClosedByClient
-		close_client(client)
 	}
 
 	/* NOTE: iorings are badly designed... */
@@ -338,7 +326,6 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 		if event.bytes == 0 {
 			// NOTE: presumably this means we're out of memory in the async_rw_buffer?
 			client.state = .ClosedByClient
-			cancel_io_and_close_client(client)
 		} else {
 			client.async_rw_prev_pos = client.async_rw_pos
 			client.async_rw_pos += int(event.bytes)
@@ -347,7 +334,6 @@ handle_socket_event :: proc(server: ^Server, event: ^IoringEvent) -> (client: ^C
 		fallthrough
 	case .SendingFileResponseAndClosing:
 		client.state = .ClosedByServerResponse
-		close_client(client)
 	case .ClosedByClient, .ClosedByTimeout, .ClosedByServerResponse:
 	case .ClosedByServer:
 		assert(false, "Race condition!")

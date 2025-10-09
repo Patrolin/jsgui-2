@@ -24,10 +24,7 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 	fmt.printfln("client: %v", client)
 	switch client.state {
 	case .New:
-		// start reading data
-		client.state = .Reading
 		lib.receive_client_data_async(client)
-		// accept another connection
 		lib.accept_client_async(server)
 	case .Reading:
 		request := transmute(string)client.async_rw_buffer[:client.async_rw_pos]
@@ -35,7 +32,7 @@ serve_http :: proc(server: ^lib.Server, event: ^lib.IoringEvent) {
 		fmt.printfln("request: %v, '%v'", client.async_rw_pos, request[:min(15, client.async_rw_pos)])
 		if len(request) >= len(GET_START) {
 			if !lib.starts_with(request, GET_START) {
-				lib.cancel_io_and_close_client(client)
+				lib.close_client(client)
 			} else if lib.ends_with(request, HTTP_END) {
 				// handle request
 				// TODO: handle favicons or whatever?
